@@ -1,0 +1,19 @@
+name: Rust
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  develop:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+    - name: Prepare
+      run: make prepare
+    - name: Build
+      run: make build
+    - name: Test
+      run: make test
