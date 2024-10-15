@@ -2,7 +2,9 @@
 
 This project consists of two main components: a proc-macro library for
 generating Inter-Process Communication (IPC) code for CKB scripts, and a common
-runtime library for CKB script IPC functionality.
+runtime library for CKB script IPC functionality. The proc-macro library is
+inspired from [tarpc](https://github.com/google/tarpc).
+
 
 ## Overview
 
