@@ -46,5 +46,4 @@ pub trait UnitTests {
 
     fn test_complex_types(arg1: Struct1);
     fn test_return_types() -> Result<u32, String>;
-
 }

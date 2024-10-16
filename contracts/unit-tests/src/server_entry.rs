@@ -1,10 +1,11 @@
 use alloc::{
     collections::BTreeMap,
     string::{String, ToString},
-    vec, vec::Vec,
+    vec,
+    vec::Vec,
 };
 use ckb_script_ipc_common::channel::Channel;
-use ckb_std::{high_level::inherited_fds, log::info};
+use ckb_std::high_level::inherited_fds;
 
 use crate::{
     def::{Struct0, Struct1, UnitTests},
@@ -73,23 +74,19 @@ impl UnitTests for UnitTestsServer {
     }
 
     fn test_return_types(&mut self) -> Result<u32, String> {
-        // Example logic for returning a result
-        let success = true; // This could be any condition you want to test
+        let success = true;
         if success {
-            Ok(42) // Return a successful result
+            Ok(42)
         } else {
-            Err("An error occurred".to_string()) // Return an error
+            Err("An error occurred".to_string())
         }
     }
 }
 
 pub fn server_entry() -> Result<(), Error> {
-    info!("server started");
-    // new the channel
     let fds = inherited_fds();
     assert_eq!(fds.len(), 2);
     let channel = Channel::new(fds[0].into(), fds[1].into());
-    // execute the server
     channel
         .execute(&mut UnitTestsServer.server())
         .map_err(|_| Error::ServerError)?;
