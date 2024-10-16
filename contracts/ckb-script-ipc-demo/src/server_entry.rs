@@ -1,13 +1,8 @@
+use crate::def::World;
 use crate::error::Error;
 use alloc::{format, string::String};
 use ckb_script_ipc_common::channel::Channel;
 use ckb_std::{high_level::inherited_fds, log::info};
-
-// IPC definition
-#[ckb_script_ipc::service]
-trait World {
-    fn hello(name: String) -> Result<String, u64>;
-}
 
 struct WorldServer;
 

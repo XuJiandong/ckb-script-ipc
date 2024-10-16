@@ -1,13 +1,8 @@
+use crate::def::WorldClient;
 use crate::error::Error;
-use alloc::{ffi::CString, string::String};
+use alloc::ffi::CString;
 use ckb_script_ipc_common::spawn::spawn_server;
 use ckb_std::{ckb_constants::Source, log::info};
-
-// IPC definition
-#[ckb_script_ipc::service]
-trait World {
-    fn hello(name: String) -> Result<String, u64>;
-}
 
 pub fn client_entry() -> Result<(), Error> {
     info!("client started");

@@ -6,6 +6,7 @@ members = [ "crates/ckb-script-ipc", "crates/ckb-script-ipc-common",
   # detect insertion point for newly generated crates.
   # @@INSERTION_POINT@@
   "contracts/ckb-script-ipc-demo",
+  "contracts/unit-tests",
   "tests",
 ]
 

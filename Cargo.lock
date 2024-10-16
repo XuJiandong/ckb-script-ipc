@@ -1706,6 +1706,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7dd6e30e90baa6f72411720665d41d89b9a3d039dc45b8faea1ddd07f617f6af"
 
 [[package]]
+name = "unit-tests"
+version = "1.0.0"
+dependencies = [
+ "ckb-script-ipc",
+ "ckb-script-ipc-common",
+ "ckb-std",
+ "serde",
+ "serde_molecule",
+]
+
+[[package]]
 name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"

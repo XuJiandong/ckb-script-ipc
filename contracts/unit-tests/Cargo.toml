@@ -1,0 +1,12 @@
+[package]
+name = "unit-tests"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+# TODO: update it to ckb-std 0.16.0 when it's published
+ckb-std = { git = "https://github.com/nervosnetwork/ckb-std.git", default-features = false, features = ["allocator", "ckb-types", "dummy-atomic", "log"], rev = "d74821c" }
+ckb-script-ipc-common = { path = "../../crates/ckb-script-ipc-common" }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+ckb-script-ipc = { path = "../../crates/ckb-script-ipc" }
+serde_molecule = { version = "1.1.0", default-features = false, features = ["alloc"] }
