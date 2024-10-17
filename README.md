@@ -198,8 +198,11 @@ In `serde_molecule`, this can be annotated using `#[serde(with = "dynvec_serde")
 Since this crate does not provide a way to annotate method types, it is recommended to define a new type to avoid this issue:
 
 ```rust,ignore
+use serde_molecule::dynvec_serde;
+
+#[derive(Serialize, Deserialize)]
 struct TwoDimVec {
     #[serde(with = "dynvec_serde")]
-    inner: Vec<Vec<u8>>
+    pub inner: Vec<Vec<u8>>
 }
 ```
