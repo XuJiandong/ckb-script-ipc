@@ -253,7 +253,7 @@ impl<'a> ServiceGenerator<'a> {
             #( #attrs )*
             #vis trait #service_ident: ::core::marker::Sized {
                 #( #ipc_fns )*
-                fn serve(self) -> #server_ident<Self> {
+                fn server(self) -> #server_ident<Self> {
                     #server_ident { service: self }
                 }
             }
@@ -321,7 +321,6 @@ impl<'a> ServiceGenerator<'a> {
         } = self;
 
         quote! {
-            /// The request sent over the wire from the client to the server.
             #[derive(serde::Serialize, serde::Deserialize)]
             #vis enum #request_ident {
                 #(
@@ -369,12 +368,10 @@ impl<'a> ServiceGenerator<'a> {
 
         quote! {
             impl #client_ident {
-                #vis fn new(        read: ckb_script_ipc_common::pipe::Pipe,
-                    write: ckb_script_ipc_common::pipe::Pipe)
-                    -> Self
-                {
+                #vis fn new(reader: ckb_script_ipc_common::pipe::Pipe,
+                            writer: ckb_script_ipc_common::pipe::Pipe) -> Self {
                     Self {
-                        channel: ckb_script_ipc_common::channel::Channel::new(read, write),
+                        channel: ckb_script_ipc_common::channel::Channel::new(reader, writer),
                     }
                 }
             }
@@ -403,8 +400,7 @@ impl<'a> ServiceGenerator<'a> {
                 #(
                     #[allow(unused)]
                     #( #method_attrs )*
-                    #vis fn #method_idents(&mut self, #( #args ),*)
-                        -> #return_types {
+                    #vis fn #method_idents(&mut self, #( #args ),*) -> #return_types {
                         let request = #request_ident::#camel_case_idents { #( #arg_pats ),* };
                         let resp: Result<_, ckb_script_ipc_common::error::IpcError> = self
                                 .channel
@@ -441,20 +437,9 @@ impl<'a> ToTokens for ServiceGenerator<'a> {
 }
 
 fn snake_to_camel(ident_str: &str) -> String {
-    let mut camel_ty = String::with_capacity(ident_str.len());
-
-    let mut last_char_was_underscore = true;
-    for c in ident_str.chars() {
-        match c {
-            '_' => last_char_was_underscore = true,
-            c if last_char_was_underscore => {
-                camel_ty.extend(c.to_uppercase());
-                last_char_was_underscore = false;
-            }
-            c => camel_ty.extend(c.to_lowercase()),
-        }
-    }
-
-    camel_ty.shrink_to_fit();
-    camel_ty
+    ident_str
+        .split('_')
+        .into_iter()
+        .map(|word| word[..1].to_uppercase() + &word[1..].to_lowercase())
+        .collect()
 }
