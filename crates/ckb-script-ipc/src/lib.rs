@@ -440,7 +440,6 @@ impl<'a> ToTokens for ServiceGenerator<'a> {
 fn snake_to_camel(ident_str: &str) -> String {
     ident_str
         .split('_')
-        .into_iter()
         .map(|word| word[..1].to_uppercase() + &word[1..].to_lowercase())
         .collect()
 }
