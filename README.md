@@ -42,7 +42,13 @@ pub trait World {
     fn hello(name: String) -> Result<String, u64>;
 }
 ```
-Place this in a library shared by both client and server scripts.
+
+Place this trait definition in a library that is shared by both client and
+server scripts. Note that this trait does not involve `self`. The proc-macro
+will automatically append the necessary implementations.
+
+The arguments and returned types in methods should implement the Serialize and
+Deserialize traits from serde.
 
 3. Start the server:
 
@@ -55,7 +61,8 @@ let (read_pipe, write_pipe) = spawn_server(
     &[CString::new("demo").unwrap().as_ref()],
 )?;
 ```
-You can also use `spawn_cell_server` with `code_hash/hash_type`.
+You can also use `spawn_cell_server` with `code_hash/hash_type`. The pipes
+returned will be used in client side.
 
 4. Implement and run the server:
 
@@ -77,7 +84,8 @@ impl World for WorldServer {
 
 run_server(WorldServer.server()).map_err(|_| Error::ServerError)
 ```
-The `run_server` contains a infinite loop and never returns.
+The `run_server` contains a infinite loop and never returns. The method `server`
+is implemented by proc-macro implicitly.
 
 5. Create and use the client:
 
@@ -148,8 +156,8 @@ we define the range of all VLQ from 0 to 2^64, including length, method_id, erro
 ## FAQ
 Q: What types can be used in IPC methods?
 
-A: Any arguments to IPC methods should be implemented by trait
-`serde::Serialize/serde::Deserialize`. By default, all primitive types and types
+A: Any arguments and returned types to IPC methods should be implemented by trait
+Serialize and Deserialize from serde. By default, all primitive types and types
 from standard libraries should be fine. Any user defined structure type should
 be annotated. For example:
 ```rust,ignore
