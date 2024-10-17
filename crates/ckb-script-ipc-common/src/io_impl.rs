@@ -1,4 +1,7 @@
-// from: https://github.com/rust-embedded/embedded-hal/tree/master/embedded-io/src/impls
+//!
+//! This is a shortened version of standard library's io module.
+//! Find documents from standard library.
+//!
 extern crate alloc;
 use crate::error::IpcError;
 use crate::io::{BufRead, Read, Seek, SeekFrom, Write};

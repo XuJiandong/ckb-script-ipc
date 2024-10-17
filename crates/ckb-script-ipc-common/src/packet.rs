@@ -6,7 +6,15 @@ use hex;
 use crate::utils::read_exact;
 use crate::vlq::{vlq_decode, vlq_encode};
 use crate::{error::IpcError, io::Read};
-
+/// The `Packet` trait defines the interface for handling packets in an IPC context.
+/// Types implementing this trait can be used to represent and manipulate packets.
+///
+/// # Required Methods
+///
+/// * `version` - This method returns the version of the packet.
+/// * `payload` - This method returns a reference to the payload of the packet.
+/// * `read_from` - This method reads a packet from a reader and returns an instance of the implementing type.
+/// * `serialize` - This method serializes the packet into a vector of bytes.
 pub trait Packet {
     fn version(&self) -> u8;
     fn payload(&self) -> &[u8];

@@ -7,6 +7,14 @@ use alloc::vec;
 use serde::{Deserialize, Serialize};
 use serde_molecule::{from_slice, to_vec};
 
+/// A `Channel` represents a communication channel between a client and a server.
+/// It is responsible for sending requests from the client to the server and receiving
+/// responses from the server to the client. The `Channel` uses pipes for communication.
+///
+/// # Fields
+///
+/// * `reader` - A `Pipe` used for reading data from the channel.
+/// * `writer` - A `Pipe` used for writing data to the channel.
 pub struct Channel {
     reader: Pipe,
     writer: Pipe,
@@ -19,11 +27,30 @@ impl Channel {
 }
 
 impl Channel {
-    /// Execute a server loop
-    /// 1. receive request
-    /// 2. call serve method
-    /// 3. send response
-    /// 4. continue
+    /// Executes the server loop, processing incoming requests and sending responses.
+    ///
+    /// This function runs an infinite loop, continuously receiving requests from the client,
+    /// processing them using the provided service implementation, and sending back the responses.
+    /// If an error occurs during the processing of a request or the sending of a response, the
+    /// error is logged (if logging is enabled) and the error code is sent back to the client.
+    ///
+    /// # Arguments
+    ///
+    /// * `serve` - A mutable reference to the service implementation that handles the requests and
+    ///   generates the responses. The service must implement the `Serve` trait with the appropriate
+    ///   request and response types.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `Req` - The type of the request messages. It must implement `Serialize` and `Deserialize`.
+    /// * `Resp` - The type of the response messages. It must implement `Serialize` and `Deserialize`.
+    /// * `S` - The type of the service implementation. It must implement the `Serve` trait with
+    ///   `Req` as the request type and `Resp` as the response type.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` indicating the success or failure of the server execution. If the server runs
+    /// successfully, it never returns. If an error occurs, it returns an `IpcError`.
     pub fn execute<Req, Resp, S>(mut self, serve: &mut S) -> Result<(), IpcError>
     where
         Req: Serialize + for<'de> Deserialize<'de>,
@@ -48,7 +75,46 @@ impl Channel {
             }
         }
     }
-    // used for client
+    ///
+    /// Sends a request to the server and waits for a response.
+    ///
+    /// This function serializes the request, sends it to the server, and then waits for the server's response.
+    /// It returns the deserialized response or an `IpcError` if an error occurs during the process.
+    ///
+    /// # Arguments
+    ///
+    /// * `_method_name` - A static string slice representing the name of the method being called.
+    /// * `req` - The request message to be sent to the server. It must implement `Serialize` and `Deserialize`.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `Req` - The type of the request message. It must implement `Serialize` and `Deserialize`.
+    /// * `Resp` - The type of the response message. It must implement `Serialize` and `Deserialize`.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the deserialized response message if the call is successful, or an `IpcError` if
+    /// an error occurs during the process.
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use ckb_script_ipc_common::channel::Channel;
+    /// use serde::{Serialize, Deserialize};
+    ///
+    /// #[derive(Serialize, Deserialize)]
+    /// struct MyRequest {
+    ///     // request fields
+    /// }
+    ///
+    /// #[derive(Serialize, Deserialize)]
+    /// struct MyResponse {
+    ///     // response fields
+    /// }
+    ///
+    /// let mut channel = Channel::new(reader, writer);
+    /// let request = MyRequest { /* fields */ };
+    /// let response: MyResponse = channel.call("my_method", request).expect("Failed to call method");
+    /// ```
     pub fn call<Req, Resp>(
         &mut self,
         _method_name: &'static str,

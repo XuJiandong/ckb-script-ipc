@@ -1,10 +1,16 @@
 use crate::def::World;
 use crate::error::Error;
 use alloc::{format, string::String};
-use ckb_script_ipc_common::channel::Channel;
-use ckb_std::{high_level::inherited_fds, log::info};
+use ckb_script_ipc_common::spawn::run_server;
+use ckb_std::log::info;
 
 struct WorldServer;
+
+impl WorldServer {
+    fn new() -> Self {
+        WorldServer
+    }
+}
 
 impl World for WorldServer {
     // method implementation
@@ -19,13 +25,6 @@ impl World for WorldServer {
 
 pub fn server_entry() -> Result<(), Error> {
     info!("server started");
-    // new the channel
-    let fds = inherited_fds();
-    assert_eq!(fds.len(), 2);
-    let channel = Channel::new(fds[0].into(), fds[1].into());
-    // execute the server
-    channel
-        .execute(&mut WorldServer.server())
-        .map_err(|_| Error::ServerError)?;
-    Ok(())
+    let world = WorldServer::new();
+    run_server(world.server()).map_err(|_| Error::ServerError)
 }
