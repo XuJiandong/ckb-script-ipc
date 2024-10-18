@@ -1,3 +1,4 @@
+use crate::bufreader::BufReader;
 use crate::error::ProtocolErrorCode;
 use crate::io::Write;
 use crate::ipc::Serve;
@@ -16,13 +17,16 @@ use serde_molecule::{from_slice, to_vec};
 /// * `reader` - A `Pipe` used for reading data from the channel.
 /// * `writer` - A `Pipe` used for writing data to the channel.
 pub struct Channel {
-    reader: Pipe,
+    reader: BufReader<Pipe>,
     writer: Pipe,
 }
 
 impl Channel {
     pub fn new(reader: Pipe, writer: Pipe) -> Self {
-        Self { reader, writer }
+        Self {
+            writer,
+            reader: BufReader::new(reader),
+        }
     }
 }
 
