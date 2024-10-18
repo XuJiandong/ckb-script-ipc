@@ -1,4 +1,4 @@
-use crate::{channel::Channel, error::IpcError, ipc::Serve};
+use crate::{channel::Channel, error::IpcError, ipc::Serve, pipe::Pipe};
 use alloc::vec::Vec;
 use ckb_std::{
     ckb_constants::Source,
@@ -43,7 +43,11 @@ use serde::{Deserialize, Serialize};
 ///     &[CString::new("demo").unwrap().as_ref()],
 /// ).expect("Failed to spawn server");
 /// ```
-pub fn spawn_server(index: usize, source: Source, argv: &[&CStr]) -> Result<(u64, u64), IpcError> {
+pub fn spawn_server(
+    index: usize,
+    source: Source,
+    argv: &[&CStr],
+) -> Result<(Pipe, Pipe), IpcError> {
     let (r1, w1) = pipe().map_err(IpcError::CkbSysError)?;
     let (r2, w2) = pipe().map_err(IpcError::CkbSysError)?;
     let inherited_fds = &[r2, w1];
@@ -58,7 +62,7 @@ pub fn spawn_server(index: usize, source: Source, argv: &[&CStr]) -> Result<(u64
         inherited_fds: inherited_fds.as_ptr(),
     };
     syscalls::spawn(index, source, 0, 0, &mut spgs).map_err(IpcError::CkbSysError)?;
-    Ok((r1, w2))
+    Ok((r1.into(), w2.into()))
 }
 /// Spawns a new server process using the provided code hash and hash type. This function is similar
 /// to `spawn_server`, but it uses a specific cell identified by the `code_hash` and `hash_type` to
@@ -140,6 +144,9 @@ where
 {
     let fds = inherited_fds();
     assert_eq!(fds.len(), 2);
-    let channel = Channel::new(fds[0].into(), fds[1].into());
+
+    let reader: Pipe = fds[0].into();
+    let writer: Pipe = fds[1].into();
+    let channel = Channel::new(reader, writer);
     channel.execute(&mut serve)
 }

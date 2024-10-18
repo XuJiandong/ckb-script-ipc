@@ -356,8 +356,9 @@ impl<'a> ServiceGenerator<'a> {
 
         quote! {
             #[allow(unused)]
-            #vis struct #client_ident {
-                channel: ckb_script_ipc_common::channel::Channel,
+            #vis struct #client_ident<R: ckb_script_ipc_common::io::Read<Error = ckb_script_ipc_common::error::IpcError>,
+                                      W: ckb_script_ipc_common::io::Write<Error = ckb_script_ipc_common::error::IpcError>> {
+                channel: ckb_script_ipc_common::channel::Channel<R, W>,
             }
         }
     }
@@ -368,9 +369,9 @@ impl<'a> ServiceGenerator<'a> {
         } = self;
 
         quote! {
-            impl #client_ident {
-                #vis fn new(reader: ckb_script_ipc_common::pipe::Pipe,
-                            writer: ckb_script_ipc_common::pipe::Pipe) -> Self {
+            impl<R: ckb_script_ipc_common::io::Read<Error = ckb_script_ipc_common::error::IpcError>,
+                 W: ckb_script_ipc_common::io::Write<Error = ckb_script_ipc_common::error::IpcError>> #client_ident<R, W> {
+                #vis fn new(reader: R, writer: W) -> Self {
                     Self {
                         channel: ckb_script_ipc_common::channel::Channel::new(reader, writer),
                     }
@@ -396,7 +397,8 @@ impl<'a> ServiceGenerator<'a> {
         } = self;
 
         quote! {
-            impl #client_ident
+            impl<R: ckb_script_ipc_common::io::Read<Error = ckb_script_ipc_common::error::IpcError>,
+                 W: ckb_script_ipc_common::io::Write<Error = ckb_script_ipc_common::error::IpcError>> #client_ident<R, W>
             {
                 #(
                     #[allow(unused)]

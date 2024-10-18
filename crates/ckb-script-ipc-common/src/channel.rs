@@ -1,9 +1,9 @@
 use crate::bufreader::BufReader;
+use crate::error::IpcError;
 use crate::error::ProtocolErrorCode;
-use crate::io::Write;
+use crate::io::{Read, Write};
 use crate::ipc::Serve;
 use crate::packet::{Packet, RequestPacket, ResponsePacket};
-use crate::{error::IpcError, pipe::Pipe};
 use alloc::vec;
 use serde::{Deserialize, Serialize};
 use serde_molecule::{from_slice, to_vec};
@@ -16,21 +16,21 @@ use serde_molecule::{from_slice, to_vec};
 ///
 /// * `reader` - A `Pipe` used for reading data from the channel.
 /// * `writer` - A `Pipe` used for writing data to the channel.
-pub struct Channel {
-    reader: BufReader<Pipe>,
-    writer: Pipe,
+pub struct Channel<R: Read<Error = IpcError>, W: Write<Error = IpcError>> {
+    reader: BufReader<R>,
+    writer: W,
 }
 
-impl Channel {
-    pub fn new(reader: Pipe, writer: Pipe) -> Self {
+impl<R: Read<Error = IpcError>, W: Write<Error = IpcError>> Channel<R, W> {
+    pub fn new(reader: R, writer: W) -> Self {
         Self {
-            writer,
             reader: BufReader::new(reader),
+            writer,
         }
     }
 }
 
-impl Channel {
+impl<R: Read<Error = IpcError>, W: Write<Error = IpcError>> Channel<R, W> {
     /// Executes the server loop, processing incoming requests and sending responses.
     ///
     /// This function runs an infinite loop, continuously receiving requests from the client,

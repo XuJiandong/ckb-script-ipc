@@ -16,7 +16,7 @@ pub fn client_entry() -> Result<(), Error> {
     .map_err(|_| Error::CkbSysError)?;
 
     // new client
-    let mut client = UnitTestsClient::new(read_pipe.into(), write_pipe.into());
+    let mut client = UnitTestsClient::new(read_pipe, write_pipe);
     client.test_primitive_types(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, true);
     info!("test_primitive_types success");
 
