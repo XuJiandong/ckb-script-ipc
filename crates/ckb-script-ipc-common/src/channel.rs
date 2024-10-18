@@ -8,14 +8,14 @@ use alloc::vec;
 use serde::{Deserialize, Serialize};
 use serde_molecule::{from_slice, to_vec};
 
-/// A `Channel` represents a communication channel between a client and a server.
-/// It is responsible for sending requests from the client to the server and receiving
-/// responses from the server to the client. The `Channel` uses pipes for communication.
+/// The `Channel` struct facilitates communication between a client and a server.
+/// It handles the transmission of requests from the client to the server and the reception
+/// of responses from the server to the client. Communication is achieved through the use of pipes.
 ///
 /// # Fields
 ///
-/// * `reader` - A `Pipe` used for reading data from the channel.
-/// * `writer` - A `Pipe` used for writing data to the channel.
+/// * `reader` - Responsible for reading data from the channel.
+/// * `writer` - Responsible for writing data to the channel.
 pub struct Channel<R: Read<Error = IpcError>, W: Write<Error = IpcError>> {
     reader: BufReader<R>,
     writer: W,

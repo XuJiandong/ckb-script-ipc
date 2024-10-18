@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// # Returns
 ///
-/// A `Result` containing a tuple of two `u64` values representing the read and write file descriptors
+/// A `Result` containing a tuple of two `Pipe` representing the read and write file descriptors
 /// for the parent process, or an `IpcError` if an error occurs.
 ///
 /// # Errors
@@ -77,7 +77,7 @@ pub fn spawn_server(
 ///
 /// # Returns
 ///
-/// A `Result` containing a tuple of two `u64` values representing the read and write file descriptors
+/// A `Result` containing a tuple of two `Pipe` representing the read and write file descriptors
 /// for the parent process, or an `IpcError` if an error occurs.
 ///
 /// # Errors
@@ -101,13 +101,13 @@ pub fn spawn_cell_server(
     code_hash: &[u8],
     hash_type: ScriptHashType,
     argv: &[&CStr],
-) -> Result<(u64, u64), IpcError> {
+) -> Result<(Pipe, Pipe), IpcError> {
     let (r1, w1) = pipe().map_err(IpcError::CkbSysError)?;
     let (r2, w2) = pipe().map_err(IpcError::CkbSysError)?;
     let inherited_fds = &[r2, w1];
 
     spawn_cell(code_hash, hash_type, argv, inherited_fds).map_err(IpcError::CkbSysError)?;
-    Ok((r1, w2))
+    Ok((r1.into(), w2.into()))
 }
 /// Runs the server with the provided service implementation. This function listens for incoming
 /// requests, processes them using the provided service, and sends back the responses. It uses
