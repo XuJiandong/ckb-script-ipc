@@ -19,12 +19,15 @@ impl World for WorldServer {
 #[test]
 fn test_generate() {
     let _ = WorldServer;
-    let _ = WorldClient::new(0u64.into(), 0u64.into());
+    let reader: Pipe = 0u64.into();
+    let writer: Pipe = 1u64.into();
+    let _ = WorldClient::new(reader, writer);
 }
 
 extern crate alloc;
 use alloc::collections::BTreeMap;
 use alloc::collections::LinkedList;
+use ckb_script_ipc_common::pipe::Pipe;
 use serde_molecule::dynvec_serde;
 use serde_molecule::struct_serde;
 

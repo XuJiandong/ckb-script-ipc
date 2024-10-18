@@ -4,7 +4,7 @@ use alloc::{
     vec,
     vec::Vec,
 };
-use ckb_script_ipc_common::channel::Channel;
+use ckb_script_ipc_common::{channel::Channel, pipe::Pipe};
 use ckb_std::high_level::inherited_fds;
 
 use crate::{
@@ -86,7 +86,9 @@ impl UnitTests for UnitTestsServer {
 pub fn server_entry() -> Result<(), Error> {
     let fds = inherited_fds();
     assert_eq!(fds.len(), 2);
-    let channel = Channel::new(fds[0].into(), fds[1].into());
+    let read_pipe: Pipe = fds[0].into();
+    let write_pipe: Pipe = fds[1].into();
+    let channel = Channel::new(read_pipe, write_pipe);
     channel
         .execute(&mut UnitTestsServer.server())
         .map_err(|_| Error::ServerError)?;

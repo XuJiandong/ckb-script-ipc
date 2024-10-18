@@ -17,7 +17,7 @@ pub fn client_entry() -> Result<(), Error> {
     .map_err(|_| Error::CkbSysError)?;
 
     // new client
-    let mut client = WorldClient::new(read_pipe.into(), write_pipe.into());
+    let mut client = WorldClient::new(read_pipe, write_pipe);
     // invoke
     let ret = client.hello("world".into()).unwrap();
     info!("IPC response: {:?}", ret);

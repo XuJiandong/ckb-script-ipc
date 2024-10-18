@@ -92,7 +92,7 @@ is implemented by proc-macro implicitly.
 ```rust,ignore
 use crate::def::WorldClient;
 
-let mut client = WorldClient::new(read_pipe.into(), write_pipe.into());
+let mut client = WorldClient::new(read_pipe, write_pipe);
 let ret = client.hello("world".into()).unwrap();
 ```
 The `read_pipe`/`write_pipe` are passed into server from `spawn_server`.
