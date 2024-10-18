@@ -1,3 +1,7 @@
+//!
+//! This is a shortened version of standard library's io module.
+//! Find documents from standard library.
+//!
 use crate::{
     error::IpcError,
     io::{BufRead, Read},
