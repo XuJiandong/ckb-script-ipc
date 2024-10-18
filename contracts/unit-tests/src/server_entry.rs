@@ -39,7 +39,7 @@ impl UnitTests for UnitTestsServer {
         assert_eq!(arg8, 8);
         assert_eq!(arg9, 9);
         assert_eq!(arg10, 10);
-        assert_eq!(arg11, true);
+        assert!(arg11);
     }
 
     fn test_vec(&mut self, vec: Vec<i32>) {

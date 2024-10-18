@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use alloc::{collections::btree_map::BTreeMap, string::String, vec::Vec};
 use serde::{Deserialize, Serialize};
 use serde_molecule::{dynvec_serde, struct_serde};
