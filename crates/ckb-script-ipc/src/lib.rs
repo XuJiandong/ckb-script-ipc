@@ -356,8 +356,11 @@ impl<'a> ServiceGenerator<'a> {
 
         quote! {
             #[allow(unused)]
-            #vis struct #client_ident<R: ckb_script_ipc_common::io::Read<Error = ckb_script_ipc_common::error::IpcError>,
-                                      W: ckb_script_ipc_common::io::Write<Error = ckb_script_ipc_common::error::IpcError>> {
+            #vis struct #client_ident<R, W>
+            where
+                R: ckb_script_ipc_common::io::Read<Error = ckb_script_ipc_common::error::IpcError>,
+                W: ckb_script_ipc_common::io::Write<Error = ckb_script_ipc_common::error::IpcError>,
+            {
                 channel: ckb_script_ipc_common::channel::Channel<R, W>,
             }
         }
@@ -369,12 +372,14 @@ impl<'a> ServiceGenerator<'a> {
         } = self;
 
         quote! {
-            impl<R: ckb_script_ipc_common::io::Read<Error = ckb_script_ipc_common::error::IpcError>,
-                 W: ckb_script_ipc_common::io::Write<Error = ckb_script_ipc_common::error::IpcError>> #client_ident<R, W> {
+            impl<R, W> #client_ident<R, W>
+            where
+                R: ckb_script_ipc_common::io::Read<Error = ckb_script_ipc_common::error::IpcError>,
+                W: ckb_script_ipc_common::io::Write<Error = ckb_script_ipc_common::error::IpcError>,
+            {
                 #vis fn new(reader: R, writer: W) -> Self {
-                    Self {
-                        channel: ckb_script_ipc_common::channel::Channel::new(reader, writer),
-                    }
+                    let channel = ckb_script_ipc_common::channel::Channel::new(reader, writer);
+                    Self { channel }
                 }
             }
         }
@@ -397,8 +402,10 @@ impl<'a> ServiceGenerator<'a> {
         } = self;
 
         quote! {
-            impl<R: ckb_script_ipc_common::io::Read<Error = ckb_script_ipc_common::error::IpcError>,
-                 W: ckb_script_ipc_common::io::Write<Error = ckb_script_ipc_common::error::IpcError>> #client_ident<R, W>
+            impl<R, W> #client_ident<R, W>
+            where
+                R: ckb_script_ipc_common::io::Read<Error = ckb_script_ipc_common::error::IpcError>,
+                W: ckb_script_ipc_common::io::Write<Error = ckb_script_ipc_common::error::IpcError>
             {
                 #(
                     #[allow(unused)]
