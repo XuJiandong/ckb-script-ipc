@@ -201,3 +201,68 @@ impl<W: ?Sized + Write> Drop for BufWriter<W> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bufwriter_write_to_memory() {
+        let inner = Vec::new();
+        let mut writer = BufWriter::with_capacity(8, inner);
+
+        writer.write_all(b"Hello").unwrap();
+        writer.write_all(b", World!").unwrap();
+        writer.flush().unwrap();
+
+        assert_eq!(writer.get_ref(), b"Hello, World!");
+    }
+
+    #[test]
+    fn test_bufwriter_capacity() {
+        let inner = Vec::new();
+        let writer = BufWriter::with_capacity(16, inner);
+
+        assert_eq!(writer.capacity(), 16);
+    }
+
+    #[test]
+    fn test_bufwriter_small_writes() {
+        let inner = Vec::new();
+        let mut writer = BufWriter::with_capacity(8, inner);
+
+        writer.write_all(b"a").unwrap();
+        writer.write_all(b"b").unwrap();
+        writer.write_all(b"c").unwrap();
+
+        assert_eq!(writer.buffer(), b"abc");
+        assert_eq!(writer.get_ref().len(), 0); // Not flushed yet
+
+        writer.flush().unwrap();
+        assert_eq!(writer.get_ref(), b"abc");
+    }
+
+    #[test]
+    fn test_bufwriter_large_write() {
+        let inner = Vec::new();
+        let mut writer = BufWriter::with_capacity(8, inner);
+
+        writer.write_all(b"abcdefghijklmnop").unwrap();
+
+        assert!(writer.buffer().is_empty()); // Buffer should be flushed
+        assert_eq!(writer.get_ref(), b"abcdefghijklmnop");
+    }
+
+    #[test]
+    fn test_bufwriter_multiple_flushes() {
+        let inner = Vec::new();
+        let mut writer = BufWriter::with_capacity(4, inner);
+
+        writer.write_all(b"ab").unwrap();
+        writer.flush().unwrap();
+        writer.write_all(b"cd").unwrap();
+        writer.flush().unwrap();
+
+        assert_eq!(writer.get_ref(), b"abcd");
+    }
+}
