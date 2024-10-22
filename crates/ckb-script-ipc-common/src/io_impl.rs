@@ -8,6 +8,71 @@ use crate::io::{BufRead, Read, Seek, SeekFrom, Write};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
+pub enum ReadExactError {
+    General,
+    UnexpectedEof,
+}
+
+pub(crate) fn default_read_exact<R: Read + ?Sized>(
+    this: &mut R,
+    mut buf: &mut [u8],
+) -> Result<(), ReadExactError> {
+    while !buf.is_empty() {
+        match this.read(buf) {
+            Ok(0) => break,
+            Ok(n) => {
+                buf = &mut buf[n..];
+            }
+            Err(_) => return Err(ReadExactError::General),
+        }
+    }
+    if !buf.is_empty() {
+        Err(ReadExactError::UnexpectedEof)
+    } else {
+        Ok(())
+    }
+}
+
+impl<T: ?Sized + Read> Read for &mut T {
+    type Error = T::Error;
+    #[inline]
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
+        T::read(self, buf)
+    }
+}
+
+impl<T: ?Sized + BufRead> BufRead for &mut T {
+    type Error = T::Error;
+    fn fill_buf(&mut self) -> Result<&[u8], Self::Error> {
+        T::fill_buf(self)
+    }
+
+    fn consume(&mut self, amt: usize) {
+        T::consume(self, amt);
+    }
+}
+
+impl<T: ?Sized + Write> Write for &mut T {
+    type Error = T::Error;
+    #[inline]
+    fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+        T::write(self, buf)
+    }
+
+    #[inline]
+    fn flush(&mut self) -> Result<(), Self::Error> {
+        T::flush(self)
+    }
+}
+
+impl<T: ?Sized + Seek> Seek for &mut T {
+    type Error = T::Error;
+    #[inline]
+    fn seek(&mut self, pos: SeekFrom) -> Result<u64, Self::Error> {
+        T::seek(self, pos)
+    }
+}
+
 impl<T: ?Sized + Read> Read for Box<T> {
     type Error = T::Error;
     #[inline]
