@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Lyndon <lynndon@gmail.com>"]
 license = "MIT"
 repository = "https://github.com/xujiandong/ckb-script-ipc"
-keywords = ["ipc", "ckb", "script"]
+keywords = ["macro", "blockchain", "no_std"]
 readme = "../../README.md"
 description = "Proc macros for CKB Script IPC."
 
