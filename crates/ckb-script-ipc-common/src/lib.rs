@@ -1,6 +1,7 @@
 #![no_std]
 extern crate alloc;
 pub mod bufreader;
+pub mod bufwriter;
 pub mod channel;
 pub mod error;
 pub mod io;
