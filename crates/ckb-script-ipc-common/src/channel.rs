@@ -1,9 +1,11 @@
-use crate::bufreader::BufReader;
-use crate::error::IpcError;
-use crate::error::ProtocolErrorCode;
-use crate::io::{Read, Write};
-use crate::ipc::Serve;
-use crate::packet::{Packet, RequestPacket, ResponsePacket};
+use crate::{
+    bufreader::BufReader,
+    bufwriter::BufWriter,
+    error::{IpcError, ProtocolErrorCode},
+    io::{Read, Write},
+    ipc::Serve,
+    packet::{Packet, RequestPacket, ResponsePacket},
+};
 use alloc::vec;
 use serde::{Deserialize, Serialize};
 use serde_molecule::{from_slice, to_vec};
@@ -18,14 +20,14 @@ use serde_molecule::{from_slice, to_vec};
 /// * `writer` - Responsible for writing data to the channel.
 pub struct Channel<R: Read<Error = IpcError>, W: Write<Error = IpcError>> {
     reader: BufReader<R>,
-    writer: W,
+    writer: BufWriter<W>,
 }
 
 impl<R: Read<Error = IpcError>, W: Write<Error = IpcError>> Channel<R, W> {
     pub fn new(reader: R, writer: W) -> Self {
         Self {
             reader: BufReader::new(reader),
-            writer,
+            writer: BufWriter::new(writer),
         }
     }
 }
@@ -146,6 +148,7 @@ impl<R: Read<Error = IpcError>, W: Write<Error = IpcError>> Channel<R, W> {
 
         let bytes = packet.serialize();
         self.writer.write(&bytes)?;
+        self.writer.flush()?;
         Ok(())
     }
     pub fn send_response<Resp: Serialize>(&mut self, resp: Resp) -> Result<(), IpcError> {
@@ -156,6 +159,7 @@ impl<R: Read<Error = IpcError>, W: Write<Error = IpcError>> Channel<R, W> {
 
         let bytes = packet.serialize();
         self.writer.write(&bytes)?;
+        self.writer.flush()?;
         Ok(())
     }
     pub fn send_error_code(&mut self, error_code: ProtocolErrorCode) -> Result<(), IpcError> {
@@ -164,6 +168,7 @@ impl<R: Read<Error = IpcError>, W: Write<Error = IpcError>> Channel<R, W> {
         log::info!("send error code: {:?}", error_code as u64);
         let bytes = packet.serialize();
         self.writer.write(&bytes)?;
+        self.writer.flush()?;
         Ok(())
     }
     pub fn receive_request<Req: for<'de> Deserialize<'de>>(&mut self) -> Result<Req, IpcError> {
