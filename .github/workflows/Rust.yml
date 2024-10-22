@@ -2,7 +2,6 @@ name: Rust
 
 on:
   pull_request:
-  push:
 
 jobs:
   develop:
@@ -13,6 +12,8 @@ jobs:
         submodules: true
     - name: Prepare
       run: make prepare
+    - name: Format & Clippy
+      run: make clippy && cargo fmt -- --check
     - name: Build
       run: make build
     - name: Test

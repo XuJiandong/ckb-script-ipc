@@ -3,7 +3,6 @@ use alloc::vec::Vec;
 use core::fmt::{Debug, Formatter, Result as FmtResult};
 use hex;
 
-use crate::utils::read_exact;
 use crate::vlq::{vlq_decode, vlq_encode};
 use crate::{error::IpcError, io::Read};
 /// The `Packet` trait defines the interface for handling packets in an IPC context.
@@ -48,7 +47,9 @@ impl Packet for RequestPacket {
         let method_id = read_next_vlq(reader)?;
         let payload_length = read_next_vlq(reader)?;
         let mut payload = vec![0u8; payload_length as usize];
-        read_exact(reader, &mut payload[..])?;
+        reader
+            .read_exact(&mut payload[..])
+            .map_err(|_| IpcError::ReadExactError)?;
         Ok(RequestPacket {
             version,
             method_id,
@@ -107,7 +108,9 @@ impl Packet for ResponsePacket {
         let error_code = read_next_vlq(reader)?;
         let payload_length = read_next_vlq(reader)?;
         let mut payload = vec![0u8; payload_length as usize];
-        read_exact(reader, &mut payload[..])?;
+        reader
+            .read_exact(&mut payload[..])
+            .map_err(|_| IpcError::ReadExactError)?;
         Ok(ResponsePacket {
             version,
             error_code,

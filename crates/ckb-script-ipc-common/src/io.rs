@@ -3,9 +3,14 @@
 //! Find documents from standard library.
 //!
 use crate::error::Error;
+use crate::io_impl::{default_read_exact, ReadExactError};
+
 pub trait Read {
     type Error: Error;
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error>;
+    fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), ReadExactError> {
+        default_read_exact(self, buf)
+    }
 }
 
 pub trait BufRead {
@@ -49,45 +54,5 @@ pub trait Seek {
     }
     fn stream_position(&mut self) -> Result<u64, Self::Error> {
         self.seek(SeekFrom::Current(0))
-    }
-}
-
-impl<T: ?Sized + Read> Read for &mut T {
-    type Error = T::Error;
-    #[inline]
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        T::read(self, buf)
-    }
-}
-
-impl<T: ?Sized + BufRead> BufRead for &mut T {
-    type Error = T::Error;
-    fn fill_buf(&mut self) -> Result<&[u8], Self::Error> {
-        T::fill_buf(self)
-    }
-
-    fn consume(&mut self, amt: usize) {
-        T::consume(self, amt);
-    }
-}
-
-impl<T: ?Sized + Write> Write for &mut T {
-    type Error = T::Error;
-    #[inline]
-    fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        T::write(self, buf)
-    }
-
-    #[inline]
-    fn flush(&mut self) -> Result<(), Self::Error> {
-        T::flush(self)
-    }
-}
-
-impl<T: ?Sized + Seek> Seek for &mut T {
-    type Error = T::Error;
-    #[inline]
-    fn seek(&mut self, pos: SeekFrom) -> Result<u64, Self::Error> {
-        T::seek(self, pos)
     }
 }
