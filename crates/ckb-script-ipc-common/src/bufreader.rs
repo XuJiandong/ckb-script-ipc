@@ -116,3 +116,81 @@ where
             .finish()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bufreader_with_capacity() {
+        let data = b"Hello, world!".to_vec();
+        let mut reader = BufReader::with_capacity(5, &data[..]);
+
+        assert_eq!(reader.capacity(), 5);
+
+        let mut buffer = [0u8; 13];
+        assert_eq!(reader.read(&mut buffer).unwrap(), 13);
+        assert_eq!(&buffer, b"Hello, world!");
+    }
+
+    #[test]
+    fn test_bufreader_read_partial() {
+        let data = b"The quick brown fox jumps over the lazy dog".to_vec();
+        let mut reader = BufReader::with_capacity(10, &data[..]);
+
+        let mut buffer = [0u8; 15];
+        assert_eq!(reader.read(&mut buffer).unwrap(), 15);
+        assert_eq!(&buffer, b"The quick brown");
+
+        assert_eq!(reader.read(&mut buffer).unwrap(), 15);
+        assert_eq!(&buffer, b" fox jumps over");
+    }
+
+    #[test]
+    fn test_bufreader_large_capacity() {
+        let data = b"Small data".to_vec();
+        let mut reader = BufReader::with_capacity(100, &data[..]);
+
+        assert_eq!(reader.capacity(), 100);
+
+        let mut buffer = [0u8; 10];
+        assert_eq!(reader.read(&mut buffer).unwrap(), 10);
+        assert_eq!(&buffer, b"Small data");
+    }
+
+    #[test]
+    fn test_bufreader_fill_buf() {
+        let data = b"Buffer test".to_vec();
+        let mut reader = BufReader::with_capacity(6, &data[..]);
+
+        let buf = reader.fill_buf().unwrap();
+        assert_eq!(buf, b"Buffer");
+
+        reader.consume(3);
+        let buf = reader.fill_buf().unwrap();
+        assert_eq!(buf, b"fer");
+    }
+
+    #[test]
+    fn test_bufreader_discard_buffer() {
+        let data = b"Discard this buffer".to_vec();
+        let mut reader = BufReader::with_capacity(8, &data[..]);
+
+        let mut buffer = [0u8; 7];
+        assert_eq!(reader.read(&mut buffer).unwrap(), 7);
+        assert_eq!(&buffer, b"Discard");
+
+        let mut buffer = [0u8; 11];
+        assert_eq!(reader.read(&mut buffer).unwrap(), 1);
+        assert_eq!(&buffer[..1], b" ");
+
+        // Read the remaining content
+        let mut buffer = [0u8; 11];
+        assert_eq!(reader.read(&mut buffer).unwrap(), 11);
+        assert_eq!(&buffer, b"this buffer");
+
+        // Ensure we've read everything
+        let mut buffer = [0u8; 1];
+        assert_eq!(reader.read(&mut buffer).unwrap(), 0);
+    }
+}
