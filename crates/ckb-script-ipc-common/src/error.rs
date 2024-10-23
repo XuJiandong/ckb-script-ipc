@@ -1,5 +1,6 @@
 use ckb_std::error::SysError;
 use core::fmt::{self, Debug, Display};
+use enumn::N;
 
 // use core::error::Error when Rust 1.81 is used.
 pub trait Error: Debug + Display {
@@ -39,7 +40,7 @@ impl Error for IpcError {
 /// Protocol error code used in wire protocol.
 /// Its range from 1 to 2^64 - 1.
 /// 1~20 are with same values used in syscall error.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, N)]
 #[repr(u64)]
 pub enum ProtocolErrorCode {
     Ok = 0,
@@ -117,9 +118,6 @@ impl From<IpcError> for ProtocolErrorCode {
 
 impl From<u64> for ProtocolErrorCode {
     fn from(e: u64) -> Self {
-        if e > ProtocolErrorCode::EndOfError as u64 || (e > 9 && e < 20) {
-            panic!("Invalid protocol error code: {}", e);
-        }
-        unsafe { core::mem::transmute(e) }
+        Self::n(e).unwrap()
     }
 }
