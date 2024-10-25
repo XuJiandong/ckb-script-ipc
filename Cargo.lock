@@ -226,6 +226,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ckb-crypto-service"
+version = "0.1.0"
+dependencies = [
+ "ckb-std",
+]
+
+[[package]]
 name = "ckb-dao"
 version = "0.118.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
