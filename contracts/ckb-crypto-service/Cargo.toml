@@ -1,0 +1,8 @@
+[package]
+name = "ckb-crypto-service"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# TODO: update it to ckb-std 0.16.0 when it's published
+ckb-std = { git = "https://github.com/nervosnetwork/ckb-std.git", default-features = false, features = ["allocator", "ckb-types", "dummy-atomic", "log"], rev = "d74821c" }
