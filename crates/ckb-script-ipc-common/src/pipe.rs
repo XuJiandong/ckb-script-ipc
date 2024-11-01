@@ -1,5 +1,5 @@
-use crate::error::IpcError;
-use crate::io::{Read, Write};
+use ckb_core_io::Error as CoreIOError;
+use ckb_core_io::{Read, Write};
 use ckb_std::syscalls::{read, write};
 
 pub struct Pipe {
@@ -31,25 +31,28 @@ impl From<u64> for Pipe {
 }
 
 impl Read for Pipe {
-    type Error = IpcError;
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, CoreIOError> {
         match read(self.id, buf) {
             Ok(n) => Ok(n),
-            Err(e) => Err(IpcError::CkbSysError(e)),
+            // TODO
+            Err(_e) => Err(CoreIOError::InvalidInput),
         }
     }
 }
 
 impl Write for Pipe {
-    type Error = IpcError;
-    fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, CoreIOError> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
         match write(self.id, buf) {
             Ok(n) => Ok(n),
-            Err(e) => Err(IpcError::CkbSysError(e)),
+            // TODO
+            Err(_e) => Err(CoreIOError::InvalidInput),
         }
     }
 
-    fn flush(&mut self) -> Result<(), Self::Error> {
+    fn flush(&mut self) -> Result<(), CoreIOError> {
         Ok(())
     }
 }

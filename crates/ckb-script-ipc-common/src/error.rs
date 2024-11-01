@@ -1,3 +1,4 @@
+use ckb_core_io::Error as CoreIoError;
 use ckb_std::error::SysError;
 use core::fmt::{self, Debug, Display};
 use enumn::N;
@@ -22,6 +23,7 @@ pub enum IpcError {
     ReadUntilError,
     ReadExactError,
     BufReaderError,
+    GeneralIoError,
     ProtocolError(ProtocolErrorCode),
 }
 
@@ -34,6 +36,13 @@ impl Display for IpcError {
 impl Error for IpcError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         None
+    }
+}
+
+impl From<CoreIoError> for IpcError {
+    fn from(_: CoreIoError) -> Self {
+        // TODO
+        IpcError::GeneralIoError
     }
 }
 
@@ -111,6 +120,7 @@ impl From<IpcError> for ProtocolErrorCode {
             | IpcError::BufReaderError
             | IpcError::ReadUntilError
             | IpcError::ReadExactError => ProtocolErrorCode::GeneralIoError,
+            IpcError::GeneralIoError => ProtocolErrorCode::GeneralIoError,
             IpcError::ProtocolError(e) => e,
         }
     }

@@ -212,6 +212,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7e1424bf7490c14cdbd13697629ece8c1ba0ed02ff1c8a5b14a8713431ec6ff8"
 
 [[package]]
+name = "ckb-core-io"
+version = "1.0.0"
+source = "git+https://github.com/XuJiandong/ckb-core-io.git?rev=56376b6#56376b674f6379683c46dc8371eb70f99fd27a4f"
+
+[[package]]
 name = "ckb-crypto"
 version = "0.119.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -467,6 +472,7 @@ dependencies = [
 name = "ckb-script-ipc-common"
 version = "1.0.0"
 dependencies = [
+ "ckb-core-io",
  "ckb-std",
  "enumn",
  "hex",
