@@ -1,3 +1,4 @@
+use crate::service_def::Cmd;
 use ckb_testtool::ckb_types::{
     bytes::Bytes,
     core::{DepType, TransactionBuilder},
@@ -6,15 +7,13 @@ use ckb_testtool::ckb_types::{
 };
 use ckb_testtool::context::Context;
 
-#[test]
-fn test_service_blake2b() {
-    // deploy contract
+fn run_service_test(cmd: Cmd, args: Vec<u8>, witness: Vec<u8>) {
     let mut context = Context::default();
 
     let service_outpoint = context.deploy_cell_by_name("ckb-crypto-service");
 
     let out_point = context.deploy_cell_by_name("unit-tests-crypto");
-    let lock_args = vec![0];
+    let lock_args = [&[cmd.into()], args.as_slice()].concat();
 
     let lock_script = context
         .build_script(&out_point, Bytes::from(lock_args))
@@ -49,6 +48,13 @@ fn test_service_blake2b() {
         .input(input)
         .outputs(outputs)
         .outputs_data(outputs_data.pack())
+        .witness(
+            WitnessArgs::new_builder()
+                .lock(Some(ckb_testtool::ckb_types::bytes::Bytes::from(witness)).pack())
+                .build()
+                .as_bytes()
+                .pack(),
+        )
         .cell_dep(
             CellDep::new_builder()
                 .out_point(service_outpoint)
@@ -63,4 +69,16 @@ fn test_service_blake2b() {
         .verify_tx(&tx, 10_000_000)
         .expect("pass verification");
     println!("consume cycles: {}", cycles);
+}
+
+#[test]
+fn test_service_sha256() {
+    let buffer = [0u8; 256];
+
+    use sha2::{Digest, Sha256};
+    let mut ctx = Sha256::new();
+    ctx.update(&buffer);
+    let hash = ctx.finalize().to_vec();
+
+    run_service_test(Cmd::Sha256, hash, buffer.to_vec())
 }

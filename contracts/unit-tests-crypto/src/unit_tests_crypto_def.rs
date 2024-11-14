@@ -1,13 +1,13 @@
-use ckb_std::ckb_types::packed::Byte;
-
 pub enum Cmd {
-    Blake2b,
+    Blake2b = 0,
+    Sha256,
 }
 
 impl From<u8> for Cmd {
     fn from(value: u8) -> Self {
         match value {
             0 => Self::Blake2b,
+            1 => Self::Sha256,
             _ => {
                 panic!("unknow Val");
             }
@@ -15,8 +15,8 @@ impl From<u8> for Cmd {
     }
 }
 
-impl From<Byte> for Cmd {
-    fn from(value: Byte) -> Self {
-        Cmd::from(u8::from(value))
+impl From<Cmd> for u8 {
+    fn from(value: Cmd) -> Self {
+        value as u8
     }
 }

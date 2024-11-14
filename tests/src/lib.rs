@@ -11,6 +11,8 @@ use std::fs;
 use std::path::PathBuf;
 use std::str::FromStr;
 
+pub mod service_def;
+
 #[cfg(test)]
 mod tests;
 

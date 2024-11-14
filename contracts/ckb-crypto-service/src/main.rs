@@ -18,11 +18,11 @@ use ckb_std::log::{error, info};
 use sha2::{Digest, Sha256};
 
 trait Hasher {
-    fn init(&mut self) {}
     fn update(&mut self, data: &[u8]);
     fn finalize(&mut self) -> Vec<u8>;
 }
 
+#[derive(Default)]
 struct Sha256Hasher {
     ctx: Option<Sha256>,
 }
@@ -48,21 +48,23 @@ impl CryptoServer {
             hasher_count: 0,
         }
     }
+
+    fn insert_haser(&mut self, hasher: Box<dyn Hasher>) -> u64 {
+        let ctx_id = self.hasher_count;
+        self.hasher_count += 1;
+        self.hashers.insert(ctx_id, hasher);
+        ctx_id
+    }
 }
 
 impl CkbCrypto for CryptoServer {
     // method implementation
     fn sha256_init(&mut self) -> Result<u64, u64> {
-        let mut hasher = Box::new(Sha256Hasher {
+        let hasher = Box::new(Sha256Hasher {
             ctx: Some(Sha256::new()),
         });
 
-        hasher.init();
-        let ctx_id = self.hasher_count;
-        self.hasher_count += 1;
-        self.hashers.insert(ctx_id, hasher);
-
-        Ok(ctx_id)
+        Ok(self.insert_haser(hasher))
     }
     fn sha256_update(&mut self, ctx: u64, data: alloc::vec::Vec<u8>) -> Result<(), u64> {
         let hasher = self.hashers.get_mut(&ctx).expect("find ctx");
@@ -70,8 +72,8 @@ impl CkbCrypto for CryptoServer {
         Ok(())
     }
     fn sha256_finalize(&mut self, ctx: u64) -> Result<[u8; 32], u64> {
-        let mut haser = self.hashers.remove(&ctx).expect("find ctx");
-        let buf = haser.finalize();
+        let mut hasher = self.hashers.remove(&ctx).expect("find ctx");
+        let buf = hasher.finalize();
         Ok(buf.try_into().unwrap())
     }
 }
