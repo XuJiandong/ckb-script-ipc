@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ckb-testtool = "0.13.1"
+ckb-testtool = "0.14.0"
 serde_json = "1.0"
+sha2 = "0.10.8"

@@ -11,8 +11,13 @@ use std::fs;
 use std::path::PathBuf;
 use std::str::FromStr;
 
+pub mod service_def;
+
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod tests_service;
 
 // The exact same Loader code from capsule's template, except that
 // now we use MODE as the environment variable
