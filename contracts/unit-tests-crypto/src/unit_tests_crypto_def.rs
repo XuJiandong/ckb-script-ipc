@@ -1,12 +1,12 @@
 pub enum Cmd {
-    Blake2b = 0,
+    CkbBlake2b = 0,
     Sha256,
 }
 
 impl From<u8> for Cmd {
     fn from(value: u8) -> Self {
         match value {
-            0 => Self::Blake2b,
+            0 => Self::CkbBlake2b,
             1 => Self::Sha256,
             _ => {
                 panic!("unknow Val");

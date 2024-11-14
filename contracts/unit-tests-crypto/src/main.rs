@@ -62,8 +62,32 @@ impl CryptoInfo {
     }
 }
 
-fn unit_test_blake2b(_crypto_info: CryptoInfo) -> i8 {
-    0
+fn unit_test_blake2b(crypto_info: CryptoInfo) -> i8 {
+    let mut crypto_cli = crypto_info.crypto_cli;
+
+    let ctx = crypto_cli.ckbblake2b_init().expect("init black2b");
+    crypto_cli
+        .ckbblake2b_update(ctx, crypto_info.witness.clone())
+        .expect("update ckb blake2b");
+    let hash = crypto_cli
+        .ckbblake2b_finalize(ctx)
+        .expect("ckb blake2b finallize");
+
+    if hash.as_slice() != crypto_info.args.as_slice() {
+        error!(
+            "check ckb blake2b error: \n0: {:02x?} \n1: {:02x?}",
+            hash, crypto_info.args
+        );
+        info!(
+            "witness({}): {:02x?}",
+            crypto_info.witness.len(),
+            crypto_info.witness
+        );
+        return 1;
+    } else {
+        info!("check ckb blake2b success");
+        0
+    }
 }
 
 fn unit_test_sha256(crypto_info: CryptoInfo) -> i8 {
@@ -72,7 +96,7 @@ fn unit_test_sha256(crypto_info: CryptoInfo) -> i8 {
     let ctx = crypto_cli.sha256_init().expect("init black2b");
     crypto_cli
         .sha256_update(ctx, crypto_info.witness.clone())
-        .expect("update blake2b");
+        .expect("update sha256");
     let hash = crypto_cli.sha256_finalize(ctx).expect("sha256 finallize");
 
     if hash.as_slice() != crypto_info.args.as_slice() {
@@ -99,7 +123,7 @@ pub fn program_entry() -> i8 {
     let info = CryptoInfo::new();
 
     match info.cmd {
-        Cmd::Blake2b => unit_test_blake2b(info),
+        Cmd::CkbBlake2b => unit_test_blake2b(info),
         Cmd::Sha256 => unit_test_sha256(info),
     }
 }

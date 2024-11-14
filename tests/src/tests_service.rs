@@ -72,6 +72,13 @@ fn run_service_test(cmd: Cmd, args: Vec<u8>, witness: Vec<u8>) {
 }
 
 #[test]
+fn test_service_ckb_blake2b() {
+    let buffer = [0u8; 256];
+    let hash = ckb_testtool::ckb_hash::blake2b_256(&buffer);
+    run_service_test(Cmd::CkbBlake2b, hash.to_vec(), buffer.to_vec())
+}
+
+#[test]
 fn test_service_sha256() {
     let buffer = [0u8; 256];
 
