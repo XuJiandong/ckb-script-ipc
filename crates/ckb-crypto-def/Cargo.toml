@@ -1,0 +1,9 @@
+[package]
+name = "ckb-crypto-def"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ckb-script-ipc = { path = "../ckb-script-ipc" }
+ckb-script-ipc-common = { path = "../ckb-script-ipc-common" }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
