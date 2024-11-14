@@ -83,7 +83,7 @@ fn unit_test_blake2b(crypto_info: CryptoInfo) -> i8 {
             crypto_info.witness.len(),
             crypto_info.witness
         );
-        return 1;
+        1
     } else {
         info!("check ckb blake2b success");
         0
@@ -109,7 +109,7 @@ fn unit_test_sha256(crypto_info: CryptoInfo) -> i8 {
             crypto_info.witness.len(),
             crypto_info.witness
         );
-        return 1;
+        1
     } else {
         info!("check sha256 success");
         0
