@@ -9,7 +9,7 @@ members = [ "crates/ckb-script-ipc", "crates/ckb-script-ipc-common",
   "contracts/ckb-crypto-service",
   "contracts/ckb-script-ipc-demo",
   "contracts/unit-tests",
-  "tests", "crates/ckb-crypto-def",
+  "tests",
 ]
 
 [profile.release]

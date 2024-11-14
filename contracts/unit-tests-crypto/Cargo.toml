@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 ckb-std = { version = "0.16.3", default-features = false, features = ["allocator", "ckb-types", "dummy-atomic", "log"] }
 ckb-script-ipc-common = { path = "../../crates/ckb-script-ipc-common" }
-ckb-crypto-def = { path = "../../crates/ckb-crypto-def" }
+ckb-crypto-service = { path = "../ckb-crypto-service" }
 
 [features]
 native-simulator = ["ckb-std/native-simulator"]

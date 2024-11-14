@@ -226,22 +226,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "ckb-crypto-def"
-version = "0.1.0"
-dependencies = [
- "ckb-script-ipc",
- "ckb-script-ipc-common",
- "serde",
-]
-
-[[package]]
 name = "ckb-crypto-service"
 version = "0.1.0"
 dependencies = [
  "blake2b-ref",
- "ckb-crypto-def",
+ "ckb-script-ipc",
  "ckb-script-ipc-common",
  "ckb-std",
+ "serde",
  "sha2",
 ]
 
@@ -1783,7 +1775,7 @@ dependencies = [
 name = "unit-tests-crypto"
 version = "0.1.0"
 dependencies = [
- "ckb-crypto-def",
+ "ckb-crypto-service",
  "ckb-script-ipc-common",
  "ckb-std",
 ]

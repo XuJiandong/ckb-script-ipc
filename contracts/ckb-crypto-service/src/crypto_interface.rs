@@ -1,6 +1,3 @@
-#![no_std]
-extern crate alloc;
-
 #[ckb_script_ipc::service]
 pub trait CkbCrypto {
     fn ckbblake2b_init() -> Result<u64, u64>;

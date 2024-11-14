@@ -14,7 +14,7 @@ use unit_tests_crypto_def::Cmd;
 
 use alloc::ffi::CString;
 use alloc::vec::Vec;
-use ckb_crypto_def::CkbCryptoClient;
+use ckb_crypto_service::CkbCryptoClient;
 use ckb_script_ipc_common::{pipe::Pipe, spawn::spawn_server};
 use ckb_std::log::{error, info};
 
