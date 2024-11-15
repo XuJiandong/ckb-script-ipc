@@ -1,4 +1,4 @@
-use ckb_core_io::Error as CoreIoError;
+use ckb_rust_std::io::Error as CoreIoError;
 use ckb_std::error::SysError;
 use core::fmt::{self, Debug, Display};
 use enumn::N;

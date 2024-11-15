@@ -4,7 +4,7 @@ use crate::{
     packet::{Packet, RequestPacket, ResponsePacket},
 };
 use alloc::vec;
-use ckb_core_io::{BufReader, BufWriter, Read, Write};
+use ckb_rust_std::io::{BufReader, BufWriter, Read, Write};
 use serde::{Deserialize, Serialize};
 use serde_molecule::{from_slice, to_vec};
 

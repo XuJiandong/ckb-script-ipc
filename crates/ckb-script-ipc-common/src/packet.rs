@@ -5,7 +5,7 @@ use hex;
 
 use crate::error::IpcError;
 use crate::vlq::{vlq_decode, vlq_encode};
-use ckb_core_io::Read;
+use ckb_rust_std::io::Read;
 
 /// The `Packet` trait defines the interface for handling packets in an IPC context.
 /// Types implementing this trait can be used to represent and manipulate packets.

@@ -1,5 +1,5 @@
-use ckb_core_io::Error as CoreIOError;
-use ckb_core_io::{Read, Write};
+use ckb_rust_std::io::{Error, ErrorKind};
+use ckb_rust_std::io::{Read, Write};
 use ckb_std::syscalls::{read, write};
 
 pub struct Pipe {
@@ -31,28 +31,26 @@ impl From<u64> for Pipe {
 }
 
 impl Read for Pipe {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, CoreIOError> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         match read(self.id, buf) {
             Ok(n) => Ok(n),
-            // TODO
-            Err(_e) => Err(CoreIOError::InvalidInput),
+            Err(_e) => Err(Error::Simple(ErrorKind::Other)),
         }
     }
 }
 
 impl Write for Pipe {
-    fn write(&mut self, buf: &[u8]) -> Result<usize, CoreIOError> {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, Error> {
         if buf.is_empty() {
             return Ok(0);
         }
         match write(self.id, buf) {
             Ok(n) => Ok(n),
-            // TODO
-            Err(_e) => Err(CoreIOError::InvalidInput),
+            Err(_e) => Err(Error::Simple(ErrorKind::Other)),
         }
     }
 
-    fn flush(&mut self) -> Result<(), CoreIOError> {
+    fn flush(&mut self) -> Result<(), Error> {
         Ok(())
     }
 }
