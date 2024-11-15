@@ -90,6 +90,17 @@ fn test_service_ckb_blake2b() {
 }
 
 #[test]
+fn test_service_def_blake2b() {
+    let buffer = [0u8; 256];
+
+    let mut ctx = blake2b_ref::Blake2bBuilder::new(32).build();
+    ctx.update(&buffer);
+    let mut hash = [0u8; 32];
+    ctx.finalize(&mut hash);
+    run_service_test(Cmd::Blake2b, hash.to_vec(), buffer.to_vec())
+}
+
+#[test]
 fn test_service_sha256() {
     let buffer = [0u8; 256];
 
@@ -99,4 +110,16 @@ fn test_service_sha256() {
     let hash = ctx.finalize().to_vec();
 
     run_service_test(Cmd::Sha256, hash, buffer.to_vec())
+}
+
+#[test]
+fn test_service_ripemd160() {
+    let buffer = [0u8; 256];
+
+    use ripemd::{Digest, Ripemd160};
+    let mut ctx = Ripemd160::new();
+    ctx.update(&buffer);
+    let hash = ctx.finalize().to_vec();
+
+    run_service_test(Cmd::Ripemd160, hash, buffer.to_vec())
 }

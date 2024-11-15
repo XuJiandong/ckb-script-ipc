@@ -13,7 +13,7 @@ default_alloc!();
 
 mod crypto_interface;
 
-use crate::crypto_interface::CkbCrypto;
+use crate::crypto_interface::{CkbCrypto, CryptoError, HasherCtx, HasherType};
 use alloc::{boxed::Box, collections::BTreeMap, vec::Vec};
 use ckb_script_ipc_common::spawn::run_server;
 use ckb_std::log::{error, info};
@@ -21,6 +21,21 @@ use ckb_std::log::{error, info};
 trait Hasher {
     fn update(&mut self, data: &[u8]);
     fn finalize(&mut self) -> Vec<u8>;
+}
+
+struct Blake2b {
+    ctx: Option<blake2b_ref::Blake2b>,
+}
+impl Hasher for Blake2b {
+    fn update(&mut self, data: &[u8]) {
+        self.ctx.as_mut().unwrap().update(data);
+    }
+    fn finalize(&mut self) -> Vec<u8> {
+        let ctx = self.ctx.take().unwrap();
+        let mut buf = [0u8; 32];
+        ctx.finalize(&mut buf);
+        buf.to_vec()
+    }
 }
 
 struct Sha256Hasher {
@@ -38,18 +53,18 @@ impl Hasher for Sha256Hasher {
     }
 }
 
-struct CkbBlake2b {
-    ctx: Option<blake2b_ref::Blake2b>,
+struct Ripemd160Hasher {
+    ctx: Option<ripemd::digest::core_api::CoreWrapper<ripemd::Ripemd160Core>>,
 }
-impl Hasher for CkbBlake2b {
+impl Hasher for Ripemd160Hasher {
     fn update(&mut self, data: &[u8]) {
+        use ripemd::Digest;
         self.ctx.as_mut().unwrap().update(data);
     }
     fn finalize(&mut self) -> Vec<u8> {
+        use ripemd::Digest;
         let ctx = self.ctx.take().unwrap();
-        let mut buf = [0u8; 32];
-        ctx.finalize(&mut buf);
-        buf.to_vec()
+        ctx.finalize().to_vec()
     }
 }
 
@@ -65,57 +80,51 @@ impl CryptoServer {
             hasher_count: 0,
         }
     }
-    fn insert_haser(&mut self, hasher: Box<dyn Hasher>) -> u64 {
-        let ctx_id = self.hasher_count;
-        self.hasher_count += 1;
-        self.hashers.insert(ctx_id, hasher);
-        ctx_id
-    }
 }
 
 impl CkbCrypto for CryptoServer {
-    // method implementation
-    fn ckbblake2b_init(&mut self) -> Result<u64, u64> {
+    fn hasher_new(&mut self, hash_type: HasherType) -> Result<HasherCtx, CryptoError> {
         const CKB_HASH_PERSONALIZATION: &[u8] = b"ckb-default-hash";
 
-        let hasher = Box::new(CkbBlake2b {
-            ctx: Some(
-                blake2b_ref::Blake2bBuilder::new(32)
-                    .personal(CKB_HASH_PERSONALIZATION)
-                    .build(),
-            ),
-        });
+        let hash: Box<dyn Hasher> = match hash_type {
+            HasherType::CkbBlake2b => Box::new(Blake2b {
+                ctx: Some(
+                    blake2b_ref::Blake2bBuilder::new(32)
+                        .personal(CKB_HASH_PERSONALIZATION)
+                        .build(),
+                ),
+            }),
+            HasherType::Blake2b => Box::new(Blake2b {
+                ctx: Some(blake2b_ref::Blake2bBuilder::new(32).build()),
+            }),
+            HasherType::Sha256 => {
+                use sha2::{Digest, Sha256};
+                Box::new(Sha256Hasher {
+                    ctx: Some(Sha256::new()),
+                })
+            }
+            HasherType::Ripemd160 => {
+                use ripemd::{Digest, Ripemd160};
+                Box::new(Ripemd160Hasher {
+                    ctx: Some(Ripemd160::new()),
+                })
+            }
+        };
 
-        Ok(self.insert_haser(hasher))
+        let id = self.hasher_count;
+        self.hasher_count += 1;
+        self.hashers.insert(id, hash);
+        Ok(HasherCtx(id))
     }
-    fn ckbblake2b_update(&mut self, ctx: u64, data: alloc::vec::Vec<u8>) -> Result<(), u64> {
-        let hasher = self.hashers.get_mut(&ctx).expect("find ctx");
+    fn hasher_update(&mut self, ctx: HasherCtx, data: Vec<u8>) -> Result<(), CryptoError> {
+        let hasher = self.hashers.get_mut(&ctx.0).expect("find ctx");
         hasher.update(&data);
         Ok(())
     }
-    fn ckbblake2b_finalize(&mut self, ctx: u64) -> Result<[u8; 32], u64> {
-        let mut hasher = self.hashers.remove(&ctx).expect("find ctx");
+    fn hasher_finalize(&mut self, ctx: HasherCtx) -> Result<Vec<u8>, CryptoError> {
+        let mut hasher = self.hashers.remove(&ctx.0).expect("find ctx");
         let buf = hasher.finalize();
-        Ok(buf.try_into().unwrap())
-    }
-
-    fn sha256_init(&mut self) -> Result<u64, u64> {
-        use sha2::{Digest, Sha256};
-        let hasher = Box::new(Sha256Hasher {
-            ctx: Some(Sha256::new()),
-        });
-
-        Ok(self.insert_haser(hasher))
-    }
-    fn sha256_update(&mut self, ctx: u64, data: alloc::vec::Vec<u8>) -> Result<(), u64> {
-        let hasher = self.hashers.get_mut(&ctx).expect("find ctx");
-        hasher.update(&data);
-        Ok(())
-    }
-    fn sha256_finalize(&mut self, ctx: u64) -> Result<[u8; 32], u64> {
-        let mut hasher = self.hashers.remove(&ctx).expect("find ctx");
-        let buf = hasher.finalize();
-        Ok(buf.try_into().unwrap())
+        Ok(buf)
     }
 }
 

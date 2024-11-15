@@ -1,10 +1,23 @@
+use alloc::vec::Vec;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum CryptoError {}
+
+#[derive(Serialize, Deserialize)]
+pub enum HasherType {
+    CkbBlake2b,
+    Blake2b,
+    Sha256,
+    Ripemd160,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct HasherCtx(pub u64);
+
 #[ckb_script_ipc::service]
 pub trait CkbCrypto {
-    fn ckbblake2b_init() -> Result<u64, u64>;
-    fn ckbblake2b_update(ctx: u64, data: alloc::vec::Vec<u8>) -> Result<(), u64>;
-    fn ckbblake2b_finalize(ctx: u64) -> Result<[u8; 32], u64>;
-
-    fn sha256_init() -> Result<u64, u64>;
-    fn sha256_update(ctx: u64, data: alloc::vec::Vec<u8>) -> Result<(), u64>;
-    fn sha256_finalize(ctx: u64) -> Result<[u8; 32], u64>;
+    fn hasher_new(hash_type: HasherType) -> Result<HasherCtx, CryptoError>;
+    fn hasher_update(ctx: HasherCtx, data: Vec<u8>) -> Result<(), CryptoError>;
+    fn hasher_finalize(ctx: HasherCtx) -> Result<Vec<u8>, CryptoError>;
 }

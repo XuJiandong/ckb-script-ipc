@@ -14,7 +14,7 @@ use unit_tests_crypto_def::Cmd;
 
 use alloc::ffi::CString;
 use alloc::vec::Vec;
-use ckb_crypto_service::CkbCryptoClient;
+use ckb_crypto_service::{CkbCryptoClient, HasherType};
 use ckb_script_ipc_common::pipe::Pipe;
 use ckb_std::log::{error, info};
 
@@ -65,15 +65,17 @@ impl CryptoInfo {
     }
 }
 
-fn unit_test_blake2b(crypto_info: CryptoInfo) -> i8 {
+fn unit_test_ckb_blake2b(crypto_info: CryptoInfo) -> i8 {
     let mut crypto_cli = crypto_info.crypto_cli;
 
-    let ctx = crypto_cli.ckbblake2b_init().expect("init black2b");
+    let ctx = crypto_cli
+        .hasher_new(HasherType::CkbBlake2b)
+        .expect("init ckb blake2b");
     crypto_cli
-        .ckbblake2b_update(ctx, crypto_info.witness.clone())
+        .hasher_update(ctx.clone(), crypto_info.witness.clone())
         .expect("update ckb blake2b");
     let hash = crypto_cli
-        .ckbblake2b_finalize(ctx)
+        .hasher_finalize(ctx)
         .expect("ckb blake2b finallize");
 
     if hash.as_slice() != crypto_info.args.as_slice() {
@@ -92,16 +94,48 @@ fn unit_test_blake2b(crypto_info: CryptoInfo) -> i8 {
         0
     }
 }
+fn unit_test_blake2b(crypto_info: CryptoInfo) -> i8 {
+    let mut crypto_cli = crypto_info.crypto_cli;
+
+    let ctx = crypto_cli
+        .hasher_new(HasherType::Blake2b)
+        .expect("init def black2b");
+    crypto_cli
+        .hasher_update(ctx.clone(), crypto_info.witness.clone())
+        .expect("update def blake2b");
+    let hash = crypto_cli
+        .hasher_finalize(ctx)
+        .expect("def blake2b finallize");
+
+    if hash.as_slice() != crypto_info.args.as_slice() {
+        error!(
+            "check def blake2b error: \n0: {:02x?} \n1: {:02x?}",
+            hash, crypto_info.args
+        );
+        info!(
+            "witness({}): {:02x?}",
+            crypto_info.witness.len(),
+            crypto_info.witness
+        );
+        1
+    } else {
+        info!("check def blake2b success");
+        0
+    }
+}
 
 fn unit_test_sha256(crypto_info: CryptoInfo) -> i8 {
     let mut crypto_cli = crypto_info.crypto_cli;
 
-    let ctx = crypto_cli.sha256_init().expect("init black2b");
+    let ctx = crypto_cli
+        .hasher_new(HasherType::Sha256)
+        .expect("init sha256");
     crypto_cli
-        .sha256_update(ctx, crypto_info.witness.clone())
+        .hasher_update(ctx.clone(), crypto_info.witness.clone())
         .expect("update sha256");
-    let hash = crypto_cli.sha256_finalize(ctx).expect("sha256 finallize");
-
+    let hash = crypto_cli
+        .hasher_finalize(ctx)
+        .expect("sha256 finallize");
     if hash.as_slice() != crypto_info.args.as_slice() {
         error!(
             "check sha256 error: \n0: {:02x?} \n1: {:02x?}",
@@ -119,6 +153,35 @@ fn unit_test_sha256(crypto_info: CryptoInfo) -> i8 {
     }
 }
 
+fn unit_test_ripemd160(crypto_info: CryptoInfo) -> i8 {
+    let mut crypto_cli = crypto_info.crypto_cli;
+
+    let ctx = crypto_cli
+        .hasher_new(HasherType::Ripemd160)
+        .expect("init ripemd160");
+    crypto_cli
+        .hasher_update(ctx.clone(), crypto_info.witness.clone())
+        .expect("update ripemd160");
+    let hash = crypto_cli
+        .hasher_finalize(ctx)
+        .expect("ripemd160 finallize");
+    if hash.as_slice() != crypto_info.args.as_slice() {
+        error!(
+            "check ripemd160 error: \n0: {:02x?} \n1: {:02x?}",
+            hash, crypto_info.args
+        );
+        info!(
+            "witness({}): {:02x?}",
+            crypto_info.witness.len(),
+            crypto_info.witness
+        );
+        1
+    } else {
+        info!("check ripemd160 success");
+        0
+    }
+}
+
 pub fn program_entry() -> i8 {
     drop(ckb_std::logger::init());
     info!("unit-tests-crypto started");
@@ -126,7 +189,9 @@ pub fn program_entry() -> i8 {
     let info = CryptoInfo::new();
 
     match info.cmd {
-        Cmd::CkbBlake2b => unit_test_blake2b(info),
+        Cmd::CkbBlake2b => unit_test_ckb_blake2b(info),
+        Cmd::Blake2b => unit_test_blake2b(info),
         Cmd::Sha256 => unit_test_sha256(info),
+        Cmd::Ripemd160 => unit_test_ripemd160(info),
     }
 }
