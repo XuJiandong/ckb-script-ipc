@@ -13,7 +13,18 @@ fn run_service_test(cmd: Cmd, args: Vec<u8>, witness: Vec<u8>) {
     let service_outpoint = context.deploy_cell_by_name("ckb-crypto-service");
 
     let out_point = context.deploy_cell_by_name("unit-tests-crypto");
-    let lock_args = [&[cmd.into()], args.as_slice()].concat();
+    let lock_args = [
+        vec![cmd.into()],
+        {
+            context
+                .cells
+                .get(&service_outpoint)
+                .map(|(_, bin)| CellOutput::calc_data_hash(bin).as_bytes().to_vec())
+                .unwrap()
+        },
+        args,
+    ]
+    .concat();
 
     let lock_script = context
         .build_script(&out_point, Bytes::from(lock_args))

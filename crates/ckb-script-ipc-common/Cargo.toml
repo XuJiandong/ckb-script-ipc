@@ -12,7 +12,6 @@ description = "Common utilities for CKB Script IPC."
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# TODO: update it to ckb-std 0.16.0 when it's published
 ckb-std = { version = "0.16.3", default-features = false, features = ["allocator", "ckb-types", "dummy-atomic"] }
 
 serde = { version = "1.0.208", default-features = false, features = ["derive"] }

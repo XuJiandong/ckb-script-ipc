@@ -15,8 +15,10 @@ use unit_tests_crypto_def::Cmd;
 use alloc::ffi::CString;
 use alloc::vec::Vec;
 use ckb_crypto_service::CkbCryptoClient;
-use ckb_script_ipc_common::{pipe::Pipe, spawn::spawn_server};
+use ckb_script_ipc_common::pipe::Pipe;
 use ckb_std::log::{error, info};
+
+use ckb_script_ipc_common::spawn::spawn_cell_server;
 
 struct CryptoInfo {
     cmd: Cmd,
@@ -45,14 +47,15 @@ impl CryptoInfo {
                 .raw_data()
                 .to_vec();
 
-        let (read_pipe, write_pipe) = spawn_server(
-            0,
-            ckb_std::ckb_constants::Source::CellDep,
+        let (read_pipe, write_pipe) = spawn_cell_server(
+            &args[0..32],
+            ckb_std::ckb_types::core::ScriptHashType::Data2,
             &[CString::new("demo").unwrap().as_ref()],
         )
         .unwrap();
-        let crypto_cli = CkbCryptoClient::new(read_pipe, write_pipe);
+        let args = args[32..].to_vec();
 
+        let crypto_cli = CkbCryptoClient::new(read_pipe, write_pipe);
         Self {
             cmd,
             crypto_cli,
