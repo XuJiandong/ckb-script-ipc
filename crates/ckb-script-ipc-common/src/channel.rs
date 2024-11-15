@@ -1,12 +1,10 @@
 use crate::{
-    bufreader::BufReader,
-    bufwriter::BufWriter,
     error::{IpcError, ProtocolErrorCode},
-    io::{Read, Write},
     ipc::Serve,
     packet::{Packet, RequestPacket, ResponsePacket},
 };
 use alloc::vec;
+use ckb_rust_std::io::{BufReader, BufWriter, Read, Write};
 use serde::{Deserialize, Serialize};
 use serde_molecule::{from_slice, to_vec};
 
@@ -18,12 +16,12 @@ use serde_molecule::{from_slice, to_vec};
 ///
 /// * `reader` - Responsible for reading data from the channel.
 /// * `writer` - Responsible for writing data to the channel.
-pub struct Channel<R: Read<Error = IpcError>, W: Write<Error = IpcError>> {
+pub struct Channel<R: Read, W: Write> {
     reader: BufReader<R>,
     writer: BufWriter<W>,
 }
 
-impl<R: Read<Error = IpcError>, W: Write<Error = IpcError>> Channel<R, W> {
+impl<R: Read, W: Write> Channel<R, W> {
     pub fn new(reader: R, writer: W) -> Self {
         Self {
             reader: BufReader::new(reader),
@@ -32,7 +30,7 @@ impl<R: Read<Error = IpcError>, W: Write<Error = IpcError>> Channel<R, W> {
     }
 }
 
-impl<R: Read<Error = IpcError>, W: Write<Error = IpcError>> Channel<R, W> {
+impl<R: Read, W: Write> Channel<R, W> {
     /// Executes the server loop, processing incoming requests and sending responses.
     ///
     /// This function runs an infinite loop, continuously receiving requests from the client,

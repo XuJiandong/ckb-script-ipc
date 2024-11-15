@@ -433,6 +433,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "ckb-rust-std"
+version = "1.0.0"
+source = "git+https://github.com/XuJiandong/ckb-rust-std.git?rev=46c5a20#46c5a20d17f870bb715e59e22812cc31b1aec1a1"
+
+[[package]]
 name = "ckb-script"
 version = "0.119.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -467,6 +472,7 @@ dependencies = [
 name = "ckb-script-ipc-common"
 version = "1.0.0"
 dependencies = [
+ "ckb-rust-std",
  "ckb-std",
  "enumn",
  "hex",

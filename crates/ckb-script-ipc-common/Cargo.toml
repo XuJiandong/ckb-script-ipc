@@ -18,6 +18,7 @@ serde_molecule = { version = "1.1.0", default-features = false, features = ["all
 hex = { version = "0.4", default-features = false, features = ["alloc"]}
 log = { version = "0.4", optional = true, default-features = false }
 enumn = "0.1.14"
+ckb-rust-std = { git = "https://github.com/XuJiandong/ckb-rust-std.git", rev="46c5a20"}
 
 [features]
 default = []
