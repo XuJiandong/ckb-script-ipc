@@ -18,3 +18,5 @@ jobs:
       run: make build
     - name: Test
       run: make test
+    - name: Test on Rust 1.75
+      run: rustup run --install 1.75.0 make test
