@@ -83,7 +83,7 @@ impl CryptoServer {
 }
 
 impl CkbCrypto for CryptoServer {
-    fn hasher_new(&mut self, hash_type: HasherType) -> Result<HasherCtx, CryptoError> {
+    fn hasher_new(&mut self, hash_type: HasherType) -> HasherCtx {
         const CKB_HASH_PERSONALIZATION: &[u8] = b"ckb-default-hash";
 
         let hash: Box<dyn Hasher> = match hash_type {
@@ -114,17 +114,101 @@ impl CkbCrypto for CryptoServer {
         let id = self.hasher_count;
         self.hasher_count += 1;
         self.hashers.insert(id, hash);
-        Ok(HasherCtx(id))
+        HasherCtx(id)
     }
     fn hasher_update(&mut self, ctx: HasherCtx, data: Vec<u8>) -> Result<(), CryptoError> {
-        let hasher = self.hashers.get_mut(&ctx.0).expect("find ctx");
-        hasher.update(&data);
-        Ok(())
+        if let Some(hasher) = self.hashers.get_mut(&ctx.0) {
+            hasher.update(&data);
+            Ok(())
+        } else {
+            Err(CryptoError::InvalidContext)
+        }
     }
     fn hasher_finalize(&mut self, ctx: HasherCtx) -> Result<Vec<u8>, CryptoError> {
-        let mut hasher = self.hashers.remove(&ctx.0).expect("find ctx");
-        let buf = hasher.finalize();
-        Ok(buf)
+        if let Some(mut hasher) = self.hashers.remove(&ctx.0) {
+            Ok(hasher.finalize())
+        } else {
+            Err(CryptoError::InvalidContext)
+        }
+    }
+
+    fn secp256k1_recovery(
+        &mut self,
+        prehash: Vec<u8>,
+        signature: Vec<u8>,
+        recovery_id: u8,
+    ) -> Result<Vec<u8>, CryptoError> {
+        use k256::ecdsa::hazmat::bits2field;
+        // use k256::ecdsa::signature::Result;
+        use k256::ecdsa::{RecoveryId, Signature, VerifyingKey};
+        use k256::elliptic_curve::bigint::CheckedAdd;
+        use k256::elliptic_curve::ops::{Invert, LinearCombination, Reduce};
+        use k256::elliptic_curve::point::DecompressPoint;
+        use k256::elliptic_curve::{
+            AffinePoint, Curve, FieldBytesEncoding, PrimeField, ProjectivePoint,
+        };
+        use k256::{Scalar, Secp256k1};
+
+        let signature = Signature::from_slice(&signature).map_err(|_| CryptoError::InvalidSig)?;
+        let (r, s) = signature.split_scalars();
+        let z = <Scalar as Reduce<<Secp256k1 as k256::elliptic_curve::Curve>::Uint>>::reduce_bytes(
+            &bits2field::<Secp256k1>(&prehash).map_err(|_| CryptoError::InvalidPrehash)?,
+        );
+
+        let recovery_id = RecoveryId::from_byte(recovery_id);
+        if recovery_id.is_none() {
+            return Err(CryptoError::InvalidRecoveryId);
+        }
+        let recovery_id = recovery_id.unwrap();
+
+        let mut r_bytes = r.to_repr();
+        if recovery_id.is_x_reduced() {
+            match Option::<<Secp256k1 as k256::elliptic_curve::Curve>::Uint>::from(
+                <Secp256k1 as k256::elliptic_curve::Curve>::Uint::decode_field_bytes(&r_bytes)
+                    .checked_add(&Secp256k1::ORDER),
+            ) {
+                Some(restored) => r_bytes = restored.encode_field_bytes(),
+                // No reduction should happen here if r was reduced
+                None => return Err(CryptoError::InvalidRecoveryId),
+            };
+        }
+        #[allow(non_snake_case)]
+        let R =
+            AffinePoint::<Secp256k1>::decompress(&r_bytes, u8::from(recovery_id.is_y_odd()).into());
+
+        if R.is_none().into() {
+            return Err(CryptoError::RecoveryFailed);
+        }
+
+        #[allow(non_snake_case)]
+        let R = ProjectivePoint::<Secp256k1>::from(R.unwrap());
+        let r_inv = *r.invert();
+        let u1 = -(r_inv * z);
+        let u2 = r_inv * *s;
+        let pk = ProjectivePoint::<Secp256k1>::lincomb(
+            &ProjectivePoint::<Secp256k1>::GENERATOR,
+            &u1,
+            &R,
+            &u2,
+        );
+        let vk = VerifyingKey::from_affine(pk.into()).map_err(|_| CryptoError::RecoveryFailed)?;
+        Ok(vk.to_sec1_bytes().to_vec())
+    }
+
+    fn secp256k1_verify(
+        &mut self,
+        public_key: Vec<u8>,
+        prehash: Vec<u8>,
+        signature: Vec<u8>,
+        recovery_id: u8,
+    ) -> Result<(), CryptoError> {
+        let verify_key = self.secp256k1_recovery(prehash, signature, recovery_id)?;
+
+        if public_key != verify_key {
+            Err(CryptoError::VerifyFailed)
+        } else {
+            Ok(())
+        }
     }
 }
 

@@ -68,9 +68,7 @@ impl CryptoInfo {
 fn unit_test_ckb_blake2b(crypto_info: CryptoInfo) -> i8 {
     let mut crypto_cli = crypto_info.crypto_cli;
 
-    let ctx = crypto_cli
-        .hasher_new(HasherType::CkbBlake2b)
-        .expect("init ckb blake2b");
+    let ctx = crypto_cli.hasher_new(HasherType::CkbBlake2b);
     crypto_cli
         .hasher_update(ctx.clone(), crypto_info.witness.clone())
         .expect("update ckb blake2b");
@@ -97,9 +95,7 @@ fn unit_test_ckb_blake2b(crypto_info: CryptoInfo) -> i8 {
 fn unit_test_blake2b(crypto_info: CryptoInfo) -> i8 {
     let mut crypto_cli = crypto_info.crypto_cli;
 
-    let ctx = crypto_cli
-        .hasher_new(HasherType::Blake2b)
-        .expect("init def black2b");
+    let ctx = crypto_cli.hasher_new(HasherType::Blake2b);
     crypto_cli
         .hasher_update(ctx.clone(), crypto_info.witness.clone())
         .expect("update def blake2b");
@@ -127,15 +123,11 @@ fn unit_test_blake2b(crypto_info: CryptoInfo) -> i8 {
 fn unit_test_sha256(crypto_info: CryptoInfo) -> i8 {
     let mut crypto_cli = crypto_info.crypto_cli;
 
-    let ctx = crypto_cli
-        .hasher_new(HasherType::Sha256)
-        .expect("init sha256");
+    let ctx = crypto_cli.hasher_new(HasherType::Sha256);
     crypto_cli
         .hasher_update(ctx.clone(), crypto_info.witness.clone())
         .expect("update sha256");
-    let hash = crypto_cli
-        .hasher_finalize(ctx)
-        .expect("sha256 finallize");
+    let hash = crypto_cli.hasher_finalize(ctx).expect("sha256 finallize");
     if hash.as_slice() != crypto_info.args.as_slice() {
         error!(
             "check sha256 error: \n0: {:02x?} \n1: {:02x?}",
@@ -156,9 +148,7 @@ fn unit_test_sha256(crypto_info: CryptoInfo) -> i8 {
 fn unit_test_ripemd160(crypto_info: CryptoInfo) -> i8 {
     let mut crypto_cli = crypto_info.crypto_cli;
 
-    let ctx = crypto_cli
-        .hasher_new(HasherType::Ripemd160)
-        .expect("init ripemd160");
+    let ctx = crypto_cli.hasher_new(HasherType::Ripemd160);
     crypto_cli
         .hasher_update(ctx.clone(), crypto_info.witness.clone())
         .expect("update ripemd160");
@@ -182,6 +172,48 @@ fn unit_test_ripemd160(crypto_info: CryptoInfo) -> i8 {
     }
 }
 
+fn unit_test_secp256k1_recovery(crypto_info: CryptoInfo) -> i8 {
+    let mut crypto_cli = crypto_info.crypto_cli;
+
+    let mut witness = crypto_info.witness.as_slice();
+
+    let prehash = {
+        let len = witness[0] as usize;
+        let buf = witness[1..len + 1].to_vec();
+        witness = &witness[len + 1..];
+        buf
+    };
+
+    let signature = {
+        let len = witness[0] as usize;
+        let buf = witness[1..len + 1].to_vec();
+        witness = &witness[len + 1..];
+        buf
+    };
+
+    let recovery_id = witness[0];
+    match crypto_cli.secp256k1_recovery(prehash, signature, recovery_id) {
+        Ok(vk2) => {
+            if crypto_info.args == vk2 {
+                0
+            } else {
+                error!(
+                    "secp256k1_recovery vk failed\nin({}): {:02x?}\nre({}): {:02x?}",
+                    crypto_info.args.len(),
+                    crypto_info.args,
+                    vk2.len(),
+                    vk2
+                );
+                2
+            }
+        }
+        Err(e) => {
+            error!("secp256k1_recovery error: {:?} ", e);
+            1
+        }
+    }
+}
+
 pub fn program_entry() -> i8 {
     drop(ckb_std::logger::init());
     info!("unit-tests-crypto started");
@@ -193,5 +225,6 @@ pub fn program_entry() -> i8 {
         Cmd::Blake2b => unit_test_blake2b(info),
         Cmd::Sha256 => unit_test_sha256(info),
         Cmd::Ripemd160 => unit_test_ripemd160(info),
+        Cmd::Secp256k1Recover => unit_test_secp256k1_recovery(info),
     }
 }

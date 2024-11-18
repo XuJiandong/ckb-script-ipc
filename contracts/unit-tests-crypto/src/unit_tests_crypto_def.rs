@@ -3,6 +3,7 @@ pub enum Cmd {
     Blake2b,
     Sha256,
     Ripemd160,
+    Secp256k1Recover,
 }
 
 impl From<u8> for Cmd {
@@ -12,6 +13,7 @@ impl From<u8> for Cmd {
             1 => Self::Blake2b,
             2 => Self::Sha256,
             3 => Self::Ripemd160,
+            4 => Self::Secp256k1Recover,
             _ => {
                 panic!("unknow Val");
             }
