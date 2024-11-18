@@ -14,7 +14,7 @@ use unit_tests_crypto_def::Cmd;
 
 use alloc::ffi::CString;
 use alloc::vec::Vec;
-use ckb_crypto_service::{CkbCryptoClient, HasherType};
+use ckb_crypto_interface::{CkbCryptoClient, HasherType};
 use ckb_script_ipc_common::pipe::Pipe;
 use ckb_std::log::{error, info};
 

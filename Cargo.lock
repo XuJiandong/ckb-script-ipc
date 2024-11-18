@@ -238,17 +238,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "ckb-crypto-interface"
+version = "0.1.0"
+dependencies = [
+ "ckb-script-ipc",
+ "ckb-script-ipc-common",
+ "serde",
+]
+
+[[package]]
 name = "ckb-crypto-service"
 version = "0.1.0"
 dependencies = [
  "blake2b-ref",
+ "ckb-crypto-interface",
  "ckb-script-ipc",
  "ckb-script-ipc-common",
  "ckb-std",
  "ed25519-dalek",
  "k256",
  "ripemd",
- "serde",
  "sha2",
 ]
 
@@ -2028,7 +2037,7 @@ dependencies = [
 name = "unit-tests-crypto"
 version = "0.1.0"
 dependencies = [
- "ckb-crypto-service",
+ "ckb-crypto-interface",
  "ckb-script-ipc-common",
  "ckb-std",
 ]

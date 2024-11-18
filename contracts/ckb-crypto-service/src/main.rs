@@ -11,10 +11,8 @@ ckb_std::entry!(program_entry);
 #[cfg(not(test))]
 default_alloc!();
 
-mod crypto_interface;
-
-use crate::crypto_interface::{CkbCrypto, CryptoError, HasherCtx, HasherType};
 use alloc::{boxed::Box, collections::BTreeMap, vec::Vec};
+use ckb_crypto_interface::{CkbCrypto, CryptoError, HasherCtx, HasherType};
 use ckb_script_ipc_common::spawn::run_server;
 use ckb_std::log::{error, info};
 
