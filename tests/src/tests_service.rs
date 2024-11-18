@@ -83,14 +83,14 @@ fn run_service_test(cmd: Cmd, args: Vec<u8>, witness: Vec<u8>) {
 }
 
 #[test]
-fn test_service_ckb_blake2b() {
+fn test_ckb_blake2b() {
     let buffer = [0u8; 256];
     let hash = ckb_testtool::ckb_hash::blake2b_256(&buffer);
     run_service_test(Cmd::CkbBlake2b, hash.to_vec(), buffer.to_vec())
 }
 
 #[test]
-fn test_service_def_blake2b() {
+fn test_def_blake2b() {
     let buffer = [0u8; 256];
 
     let mut ctx = blake2b_ref::Blake2bBuilder::new(32).build();
@@ -101,7 +101,7 @@ fn test_service_def_blake2b() {
 }
 
 #[test]
-fn test_service_sha256() {
+fn test_sha256() {
     let buffer = [0u8; 256];
 
     use sha2::{Digest, Sha256};
@@ -113,7 +113,7 @@ fn test_service_sha256() {
 }
 
 #[test]
-fn test_service_ripemd160() {
+fn test_ripemd160() {
     let buffer = [0u8; 256];
 
     use ripemd::{Digest, Ripemd160};
@@ -125,7 +125,7 @@ fn test_service_ripemd160() {
 }
 
 #[test]
-fn test_service_secp256k1_recovery() {
+fn test_secp256k1_recovery() {
     // recv
     let prehash = [0u8; 32];
 
@@ -153,7 +153,7 @@ fn test_service_secp256k1_recovery() {
 }
 
 #[test]
-fn test_service_ed25519_verfiy() {
+fn test_ed25519_verfiy() {
     use ed25519_dalek::{Signer, SigningKey};
     // recv
     let prehash = [0u8; 32];
