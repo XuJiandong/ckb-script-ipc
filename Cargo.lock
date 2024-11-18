@@ -435,7 +435,7 @@ dependencies = [
 [[package]]
 name = "ckb-rust-std"
 version = "1.0.0"
-source = "git+https://github.com/XuJiandong/ckb-rust-std.git?rev=46c5a20#46c5a20d17f870bb715e59e22812cc31b1aec1a1"
+source = "git+https://github.com/XuJiandong/ckb-rust-std.git?rev=41f8ae0#41f8ae0dfa24a536c0c28ecdcd2ae4eaabfe197f"
 
 [[package]]
 name = "ckb-script"
