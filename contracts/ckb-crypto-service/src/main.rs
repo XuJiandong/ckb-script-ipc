@@ -210,6 +210,27 @@ impl CkbCrypto for CryptoServer {
             Ok(())
         }
     }
+
+    fn ed25519_verify(
+        &mut self,
+        public_key: Vec<u8>,
+        prehash: Vec<u8>,
+        signature: Vec<u8>,
+    ) -> Result<(), CryptoError> {
+        use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+
+        let signature = Signature::from_slice(&signature).map_err(|_| CryptoError::InvalidSig)?;
+        let public_key = public_key
+            .try_into()
+            .map_err(|_| CryptoError::InvalidPubkey)?;
+
+        VerifyingKey::from_bytes(&public_key)
+            .map_err(|_| CryptoError::InvalidPubkey)?
+            .verify(&prehash, &signature)
+            .map_err(|_| CryptoError::VerifyFailed)?;
+
+        Ok(())
+    }
 }
 
 pub fn program_entry() -> i8 {

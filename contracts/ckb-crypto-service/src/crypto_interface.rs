@@ -7,6 +7,7 @@ pub enum CryptoError {
     InvalidSig,
     InvalidPrehash,
     InvalidRecoveryId,
+    InvalidPubkey,
     RecoveryFailed,
     VerifyFailed,
 }
@@ -39,5 +40,11 @@ pub trait CkbCrypto {
         prehash: Vec<u8>,
         signature: Vec<u8>,
         recovery_id: u8,
+    ) -> Result<(), CryptoError>;
+
+    fn ed25519_verify(
+        public_key: Vec<u8>,
+        prehash: Vec<u8>,
+        signature: Vec<u8>,
     ) -> Result<(), CryptoError>;
 }
