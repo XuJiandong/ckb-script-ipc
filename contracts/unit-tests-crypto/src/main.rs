@@ -214,6 +214,35 @@ fn unit_test_secp256k1_recovery(crypto_info: CryptoInfo) -> i8 {
     }
 }
 
+fn unit_test_secp256k1_verify(crypto_info: CryptoInfo) -> i8 {
+    let mut crypto_cli = crypto_info.crypto_cli;
+
+    let mut witness = crypto_info.witness.as_slice();
+
+    let prehash = {
+        let len = witness[0] as usize;
+        let buf = witness[1..len + 1].to_vec();
+        witness = &witness[len + 1..];
+        buf
+    };
+
+    let signature = {
+        let len = witness[0] as usize;
+        let buf = witness[1..len + 1].to_vec();
+        witness = &witness[len + 1..];
+        buf
+    };
+
+    let recovery_id = witness[0];
+    match crypto_cli.secp256k1_verify(crypto_info.args, prehash, signature, recovery_id) {
+        Ok(_) => 0,
+        Err(e) => {
+            error!("secp256k1_recovery error: {:?} ", e);
+            1
+        }
+    }
+}
+
 fn unit_test_schnorr(crypto_info: CryptoInfo) -> i8 {
     let mut crypto_cli = crypto_info.crypto_cli;
 
@@ -277,8 +306,8 @@ pub fn program_entry() -> i8 {
         Cmd::Sha256 => unit_test_sha256(info),
         Cmd::Ripemd160 => unit_test_ripemd160(info),
         Cmd::Secp256k1Recover => unit_test_secp256k1_recovery(info),
-        Cmd::Secp256k1Verify => unit_test_secp256k1_recovery(info), // todo
-        Cmd::SchnorrVerify => unit_test_schnorr(info),              // todo
+        Cmd::Secp256k1Verify => unit_test_secp256k1_verify(info), // todo
+        Cmd::SchnorrVerify => unit_test_schnorr(info),            // todo
         Cmd::Ed25519Verfiy => unit_test_ed25519_verify(info),
     }
 }
