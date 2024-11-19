@@ -200,13 +200,42 @@ impl CkbCrypto for CryptoServer {
         signature: Vec<u8>,
         recovery_id: u8,
     ) -> Result<(), CryptoError> {
-        let verify_key = self.secp256k1_recovery(prehash, signature, recovery_id)?;
+        use k256::ecdsa::{RecoveryId, Signature, VerifyingKey};
+
+        let signature = Signature::from_slice(&signature).map_err(|_| CryptoError::InvalidSig)?;
+        let recovery_id =
+            RecoveryId::from_byte(recovery_id).ok_or(CryptoError::InvalidRecoveryId)?;
+        let verify_key = VerifyingKey::recover_from_prehash(&prehash, &signature, recovery_id)
+            .map_err(|_| CryptoError::RecoveryFailed)?
+            .to_sec1_bytes()
+            .to_vec();
 
         if public_key != verify_key {
             Err(CryptoError::VerifyFailed)
         } else {
             Ok(())
         }
+    }
+
+    fn schnorr_verify(
+        &mut self,
+        public_key: Vec<u8>,
+        prehash: Vec<u8>,
+        signature: Vec<u8>,
+    ) -> Result<(), CryptoError> {
+        use k256::schnorr::{signature::Verifier, Signature, VerifyingKey};
+
+        let signature =
+            Signature::try_from(signature.as_slice()).map_err(|_| CryptoError::InvalidSig)?;
+
+        let verify_key =
+            VerifyingKey::from_bytes(&public_key).map_err(|_| CryptoError::InvalidPubkey)?;
+
+        verify_key
+            .verify(&prehash, &signature)
+            .map_err(|_| CryptoError::VerifyFailed)?;
+
+        Ok(())
     }
 
     fn ed25519_verify(

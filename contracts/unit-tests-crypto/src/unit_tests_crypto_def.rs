@@ -5,6 +5,7 @@ pub enum Cmd {
     Ripemd160,
     Secp256k1Recover,
     Secp256k1Verify,
+    SchnorrVerify,
     Ed25519Verfiy,
 }
 
@@ -17,7 +18,8 @@ impl From<u8> for Cmd {
             3 => Self::Ripemd160,
             4 => Self::Secp256k1Recover,
             5 => Self::Secp256k1Verify,
-            6 => Self::Ed25519Verfiy,
+            6 => Self::SchnorrVerify,
+            7 => Self::Ed25519Verfiy,
             _ => {
                 panic!("unknow Val");
             }

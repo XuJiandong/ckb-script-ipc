@@ -153,6 +153,30 @@ fn test_secp256k1_recovery() {
 }
 
 #[test]
+fn test_schnorr_verfiy() {
+    use k256::schnorr::{signature::Signer, SigningKey};
+    // recv
+    let prehash = [0u8; 32];
+
+    let prikey_byte: [u8; 32] = [
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 1,
+    ];
+    let prikey = SigningKey::from_bytes(&prikey_byte).unwrap();
+    let pubkey = prikey.verifying_key();
+
+    let mut witness = Vec::new();
+    witness.push(prehash.len() as u8);
+    witness.extend_from_slice(&prehash);
+
+    let sig = prikey.sign(&prehash).to_bytes().to_vec();
+    witness.push(sig.len() as u8);
+    witness.extend_from_slice(&sig);
+
+    run_service_test(Cmd::SchnorrVerify, pubkey.to_bytes().to_vec(), witness)
+}
+
+#[test]
 fn test_ed25519_verfiy() {
     use ed25519_dalek::{Signer, SigningKey};
     // recv
