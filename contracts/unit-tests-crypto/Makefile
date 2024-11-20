@@ -42,8 +42,6 @@ build:
 		for binary in $(BINARIES); do \
 			echo "Copying binary $$binary to build directory"; \
 			cp $(TOP)/target/riscv64imac-unknown-none-elf/$(MODE)/$$binary $(TOP)/$(BUILD_DIR); \
-			cp $(TOP)/$(BUILD_DIR)/$$binary $(TOP)/$(BUILD_DIR)/$$binary.debug; \
-			$(OBJCOPY) --strip-debug --strip-all $(TOP)/$(BUILD_DIR)/$$binary; \
 		done \
 	fi
 
