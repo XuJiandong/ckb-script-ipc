@@ -254,7 +254,7 @@ dependencies = [
  "ckb-crypto-interface",
  "ckb-script-ipc",
  "ckb-script-ipc-common",
- "ckb-std",
+ "ckb-std 0.16.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "ed25519-dalek",
  "k256",
  "ripemd",
@@ -503,7 +503,7 @@ dependencies = [
 name = "ckb-script-ipc-common"
 version = "1.0.0"
 dependencies = [
- "ckb-std",
+ "ckb-std 0.16.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "enumn",
  "hex",
  "log",
@@ -517,7 +517,7 @@ version = "1.0.0"
 dependencies = [
  "ckb-script-ipc",
  "ckb-script-ipc-common",
- "ckb-std",
+ "ckb-std 0.16.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde",
 ]
 
@@ -526,6 +526,12 @@ name = "ckb-std"
 version = "0.16.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4b1813c2f163acc65880c1c11da9f1e342ebc782238cd704c68cb1472920931e"
+replace = "ckb-std 0.16.3 (git+https://github.com/nervosnetwork/ckb-std.git?rev=42d6cea)"
+
+[[package]]
+name = "ckb-std"
+version = "0.16.3"
+source = "git+https://github.com/nervosnetwork/ckb-std.git?rev=42d6cea#42d6cea0ded03cc8dfc249911b06a75b46bceed2"
 dependencies = [
  "buddy-alloc",
  "cc",
@@ -2028,7 +2034,7 @@ version = "1.0.0"
 dependencies = [
  "ckb-script-ipc",
  "ckb-script-ipc-common",
- "ckb-std",
+ "ckb-std 0.16.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde",
  "serde_molecule",
 ]
@@ -2039,7 +2045,7 @@ version = "0.1.0"
 dependencies = [
  "ckb-crypto-interface",
  "ckb-script-ipc-common",
- "ckb-std",
+ "ckb-std 0.16.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

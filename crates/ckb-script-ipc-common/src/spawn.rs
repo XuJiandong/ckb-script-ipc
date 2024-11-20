@@ -104,7 +104,7 @@ pub fn spawn_cell_server(
 ) -> Result<(Pipe, Pipe), IpcError> {
     let (r1, w1) = pipe().map_err(IpcError::CkbSysError)?;
     let (r2, w2) = pipe().map_err(IpcError::CkbSysError)?;
-    let inherited_fds = &[r2, w1, 0];
+    let inherited_fds = &[r2, w1];
 
     spawn_cell(code_hash, hash_type, argv, inherited_fds).map_err(IpcError::CkbSysError)?;
     Ok((r1.into(), w2.into()))
