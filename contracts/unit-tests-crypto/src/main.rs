@@ -228,9 +228,7 @@ fn unit_test_secp256k1_verify(crypto_info: CryptoInfo) -> i8 {
 
     let signature = {
         let len = witness[0] as usize;
-        let buf = witness[1..len + 1].to_vec();
-
-        buf
+        witness[1..len + 1].to_vec()
     };
 
     match crypto_cli.secp256k1_verify(crypto_info.args, prehash, signature) {
