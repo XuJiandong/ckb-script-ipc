@@ -1,0 +1,16 @@
+[package]
+name = "ckb-crypto-service"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ckb-crypto-interface = { path = "../../crates/ckb-crypto-interface" }
+ckb-std = { version = "0.16", default-features = false, features = ["allocator", "ckb-types", "dummy-atomic", "log"] }
+ckb-script-ipc-common = { path = "../../crates/ckb-script-ipc-common" }
+ckb-script-ipc = { path = "../../crates/ckb-script-ipc" }
+
+blake2b-ref = "0.3.1"
+sha2 = { version = "0.10.8", default-features = false }
+ripemd = { version = "0.1.3", default-features = false }
+k256 = { version = "0.13.4", default-features = false, features = ["arithmetic", "ecdsa", "schnorr", "alloc"] }
+ed25519-dalek = { version = "2.1.1", default-features = false }
