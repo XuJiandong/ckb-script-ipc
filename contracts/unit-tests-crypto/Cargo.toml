@@ -1,0 +1,12 @@
+[package]
+name = "unit-tests-crypto"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ckb-crypto-interface = { path = "../../crates/ckb-crypto-interface" }
+ckb-std = { version = "0.16.3", default-features = false, features = ["allocator", "ckb-types", "dummy-atomic", "log"] }
+ckb-script-ipc-common = { path = "../../crates/ckb-script-ipc-common" }
+
+[features]
+native-simulator = ["ckb-std/native-simulator"]
