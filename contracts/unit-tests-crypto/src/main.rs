@@ -257,8 +257,7 @@ fn unit_test_schnorr(crypto_info: CryptoInfo) -> i8 {
 
     let signature = {
         let len = witness[0] as usize;
-        let buf = witness[1..len + 1].to_vec();
-        buf
+        witness[1..len + 1].to_vec()
     };
 
     match crypto_cli.schnorr_verify(crypto_info.args, prehash, signature) {
@@ -281,8 +280,7 @@ fn unit_test_ed25519_verify(crypto_info: CryptoInfo) -> i8 {
 
     let signature = {
         let len = witness[0] as usize;
-        let buf = witness[1..len + 1].to_vec();
-        buf
+        witness[1..len + 1].to_vec()
     };
 
     match crypto_cli.ed25519_verify(crypto_info.args, prehash, signature) {
