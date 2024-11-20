@@ -16,7 +16,3 @@ members = [ "crates/ckb-script-ipc", "crates/ckb-script-ipc-common",
 overflow-checks = true
 strip = true
 codegen-units = 1
-
-# TODO This will be deleted after ckb-std is released
-[replace]
-"ckb-std:0.16.3" = { git = "https://github.com/nervosnetwork/ckb-std.git", rev = "42d6cea" }
