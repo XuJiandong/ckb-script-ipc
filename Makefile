@@ -127,7 +127,6 @@ prepare:
 	rustup target add riscv64imac-unknown-none-elf
 	cargo install --git https://github.com/nervosnetwork/ckb-standalone-debugger ckb-debugger
 
-
 # Generate checksum info for reproducible build
 CHECKSUM_FILE := build/checksums-$(MODE).txt
 checksum: build
