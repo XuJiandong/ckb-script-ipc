@@ -228,13 +228,10 @@ fn unit_test_secp256k1_verify(crypto_info: CryptoInfo) -> i8 {
 
     let signature = {
         let len = witness[0] as usize;
-        let buf = witness[1..len + 1].to_vec();
-        witness = &witness[len + 1..];
-        buf
+        witness[1..len + 1].to_vec()
     };
 
-    let recovery_id = witness[0];
-    match crypto_cli.secp256k1_verify(crypto_info.args, prehash, signature, recovery_id) {
+    match crypto_cli.secp256k1_verify(crypto_info.args, prehash, signature) {
         Ok(_) => 0,
         Err(e) => {
             error!("secp256k1_recovery error: {:?} ", e);
