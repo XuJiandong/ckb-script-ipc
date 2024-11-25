@@ -191,7 +191,11 @@ fn unit_test_secp256k1_recovery(crypto_info: CryptoInfo) -> i8 {
         buf
     };
 
+    ckb_std::debug!("--secp256k1 sign len: {}", signature.len());
+    ckb_std::debug!("--secp256k1 prehash len: {}", prehash.len());
+
     let recovery_id = witness[0];
+    ckb_std::debug!("--secp256k1 recovery_id: {}", recovery_id);
     match crypto_cli.secp256k1_recovery(prehash, signature, recovery_id) {
         Ok(vk2) => {
             if crypto_info.args == vk2 {
@@ -231,6 +235,10 @@ fn unit_test_secp256k1_verify(crypto_info: CryptoInfo) -> i8 {
         witness[1..len + 1].to_vec()
     };
 
+    ckb_std::debug!("--secp256k1 sign len: {}", signature.len());
+    ckb_std::debug!("--secp256k1 pubkey len: {}", crypto_info.args.len());
+    ckb_std::debug!("--secp256k1 prehash len: {}", prehash.len());
+
     match crypto_cli.secp256k1_verify(crypto_info.args, prehash, signature) {
         Ok(_) => 0,
         Err(e) => {
@@ -245,7 +253,7 @@ fn unit_test_schnorr(crypto_info: CryptoInfo) -> i8 {
 
     let mut witness = crypto_info.witness.as_slice();
 
-    let prehash = {
+    let message = {
         let len = witness[0] as usize;
         let buf = witness[1..len + 1].to_vec();
         witness = &witness[len + 1..];
@@ -257,7 +265,7 @@ fn unit_test_schnorr(crypto_info: CryptoInfo) -> i8 {
         witness[1..len + 1].to_vec()
     };
 
-    match crypto_cli.schnorr_verify(crypto_info.args, prehash, signature) {
+    match crypto_cli.schnorr_verify(crypto_info.args, message, signature) {
         Ok(_) => 0,
         Err(_) => 1,
     }
