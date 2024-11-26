@@ -43,6 +43,8 @@ The service supports the following hash algorithms:
 
 ## 3. Recover secp256k1 Public Key
 
+Use [k256](https://crates.io/crates/k256) implementation in service.
+
 ### Function Signature
 
 ```rust
@@ -85,7 +87,8 @@ fn secp256k1_verify(
 ### Parameters
 
 - `public_key`:
-  - The plaintext format of the public key.
+  - The plaintext format of the public key. 
+  - Decode public_key (compressed or uncompressed) from the  `Elliptic-Curve-Point-to-Octet-String` encoding described in SEC 1: [Elliptic Curve Cryptography (Version 2.0) section  2.3.3 (page 10)](http://www.secg.org/sec1-v2.pdf).
 - `prehash`:
   - Same as the `prehash` parameter in `secp256k1_recovery`.
 - `signature`:
@@ -105,7 +108,7 @@ fn secp256k1_verify(
 ```rust
 fn schnorr_verify(
     public_key: Vec<u8>,
-    msg: Vec<u8>,
+    message: Vec<u8>,
     signature: Vec<u8>,
 ) -> Result<(), CryptoError>;
 ```
@@ -114,7 +117,8 @@ fn schnorr_verify(
 
 - `public_key`:
   - The plaintext format of the public key, **32 bytes** in length.
-- `msg`:
+  - `AffinePoint` is needed here.
+- `message`:
   - Input message of arbitrary length. A **Sha256** hash will be applied during verification.
 - `signature`:
   - Schnorr signature, **64 bytes** in length.
@@ -133,7 +137,7 @@ fn schnorr_verify(
 ```rust
 fn ed25519_verify(
     public_key: Vec<u8>,
-    msg: Vec<u8>,
+    message: Vec<u8>,
     signature: Vec<u8>,
 ) -> Result<(), CryptoError>;
 ```
@@ -142,7 +146,8 @@ fn ed25519_verify(
 
 - `public_key`:
   - The plaintext format of the public key, **32 bytes** in length.
-- `msg`:
+  - For the specific format, please refer to [here](https://doc-internal.dalek.rs/ed25519_dalek/struct.ExpandedSecretKey.html).
+- `message`:
   - Input message of arbitrary length. A **Sha512** hash will be applied during verification.
 - `signature`:
   - Ed25519 signature, **64 bytes** in length.
