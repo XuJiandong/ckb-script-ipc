@@ -214,7 +214,7 @@ impl CkbCrypto for CryptoServer {
     fn schnorr_verify(
         &mut self,
         public_key: Vec<u8>,
-        prehash: Vec<u8>,
+        messge: Vec<u8>,
         signature: Vec<u8>,
     ) -> Result<(), CryptoError> {
         use k256::schnorr::{signature::Verifier, Signature, VerifyingKey};
@@ -226,7 +226,7 @@ impl CkbCrypto for CryptoServer {
             VerifyingKey::from_bytes(&public_key).map_err(|_| CryptoError::InvalidPubkey)?;
 
         verify_key
-            .verify(&prehash, &signature)
+            .verify(&messge, &signature)
             .map_err(|_| CryptoError::VerifyFailed)?;
 
         Ok(())

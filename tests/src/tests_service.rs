@@ -155,7 +155,7 @@ fn test_secp256k1_recovery() {
 #[test]
 fn test_secp256k1_verify() {
     // recv
-    let prehash = [0u8; 32];
+    let message = [0u8; 32];
 
     let prikey_byte: [u8; 32] = [
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -163,11 +163,11 @@ fn test_secp256k1_verify() {
     ];
     let prikey = k256::ecdsa::SigningKey::from_slice(&prikey_byte).unwrap();
     let pubkey = prikey.verifying_key();
-    let (sig, _recovery_id) = prikey.sign_prehash_recoverable(&prehash).unwrap();
+    let (sig, _recovery_id) = prikey.sign_prehash_recoverable(&message).unwrap();
 
     let mut witness = Vec::new();
-    witness.push(prehash.len() as u8);
-    witness.extend_from_slice(&prehash);
+    witness.push(message.len() as u8);
+    witness.extend_from_slice(&message);
 
     let sig = sig.to_bytes().to_vec();
     witness.push(sig.len() as u8);

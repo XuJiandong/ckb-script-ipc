@@ -46,7 +46,7 @@ pub trait CkbCrypto {
 
     fn schnorr_verify(
         public_key: Vec<u8>,
-        prehash: Vec<u8>,
+        message: Vec<u8>,
         signature: Vec<u8>,
     ) -> Result<(), CryptoError>;
 
