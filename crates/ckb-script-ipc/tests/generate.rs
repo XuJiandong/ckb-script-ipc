@@ -28,8 +28,6 @@ extern crate alloc;
 use alloc::collections::BTreeMap;
 use alloc::collections::LinkedList;
 use ckb_script_ipc_common::pipe::Pipe;
-use serde_molecule::dynvec_serde;
-use serde_molecule::struct_serde;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Struct1 {
@@ -40,10 +38,8 @@ pub struct Struct1 {
     pub f5: Vec<u8>,
     pub f6: String,
     pub f7: Option<u32>,
-    #[serde(with = "dynvec_serde")]
     pub f8: Vec<Vec<u8>>,
     pub f9: LinkedList<[u8; 3]>,
-    #[serde(with = "struct_serde")]
     pub f11: BTreeMap<u32, String>,
 }
 

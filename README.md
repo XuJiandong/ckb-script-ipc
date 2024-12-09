@@ -146,7 +146,7 @@ case, version + method id + length only occupies 3 bytes.
       serialization/deserialization.
     - error code: Only appears in Response, range is 0 to 2^64.
     - payload: Defined by the service provider, developers can choose freely.
-      You can use `molecule` to define the data, or choose other methods.
+      You can use `json` to define the data, or choose other methods.
 
 In theory, VLQ can represent integers of any length, but considering practical
 implementation, we need to set a boundary for easier code processing. Currently,
@@ -171,7 +171,7 @@ pub struct Struct0 {
 
 Q: What serialize/deserialize format is used for message packing and unpacking?
 
-A: [serde_molecule](https://github.com/XuJiandong/serde_molecule)
+A: [serde_json](https://crates.io/crates/serde_json)
 
 Q: How can I view code expanded by `#[ckb_script_ipc::service]`?
 
@@ -185,24 +185,3 @@ Communication (IPC) rather than Remote Procedure Call (RPC). RPC encompasses
 additional features such as encryption, authentication, error propagation,
 retries and timeouts, scaling, and more. This crate focuses on a limited subset of
 these features, primarily those relevant to IPC.
-
-
-## Vector issue
-By default, `Vec` is serialized into a [molecule
-fixvec](https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0008-serialization/0008-serialization.md#fixvec---fixed-vector).
-This works well for simple types like `Vec<u8>` or `Vec<[u8; 4]>`. However, it
-does not support complex element types such as `Vec<Vec<u8>>`. These should be
-serialized into a [molecule
-dynvec](https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0008-serialization/0008-serialization.md#dynvec---dynamic-vector).
-In `serde_molecule`, this can be annotated using `#[serde(with = "dynvec_serde")]`.
-Since this crate does not provide a way to annotate method types, it is recommended to define a new type to avoid this issue:
-
-```rust,ignore
-use serde_molecule::dynvec_serde;
-
-#[derive(Serialize, Deserialize)]
-struct TwoDimVec {
-    #[serde(with = "dynvec_serde")]
-    pub inner: Vec<Vec<u8>>
-}
-```

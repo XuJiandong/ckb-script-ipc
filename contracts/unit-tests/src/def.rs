@@ -2,7 +2,6 @@
 
 use alloc::{collections::btree_map::BTreeMap, string::String, vec::Vec};
 use serde::{Deserialize, Serialize};
-use serde_molecule::{dynvec_serde, struct_serde};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Default, Debug)]
 pub struct Struct0 {
@@ -20,9 +19,7 @@ pub struct Struct1 {
     pub f5: Vec<u8>,
     pub f6: String,
     pub f7: Option<u32>,
-    #[serde(with = "dynvec_serde")]
     pub f8: Vec<Vec<u8>>,
-    #[serde(with = "struct_serde")]
     pub f9: Struct0,
 }
 
