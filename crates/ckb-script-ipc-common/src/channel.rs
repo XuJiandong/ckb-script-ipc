@@ -6,7 +6,7 @@ use crate::{
 use alloc::vec;
 use ckb_rust_std::io::{BufReader, BufWriter, Read, Write};
 use serde::{Deserialize, Serialize};
-use serde_molecule::{from_slice, to_vec};
+use serde_json::{from_slice, to_vec};
 
 /// The `Channel` struct facilitates communication between a client and a server.
 /// It handles the transmission of requests from the client to the server and the reception
@@ -139,7 +139,7 @@ impl<R: Read, W: Write> Channel<R, W> {
         }
     }
     pub fn send_request<Req: Serialize>(&mut self, req: Req) -> Result<(), IpcError> {
-        let serialized_req = to_vec(&req, false).map_err(|_| IpcError::SerializeError)?;
+        let serialized_req = to_vec(&req).map_err(|_| IpcError::SerializeError)?;
         let packet = RequestPacket::new(serialized_req);
         #[cfg(feature = "enable-logging")]
         log::info!("send request: {:?}", packet);
@@ -150,7 +150,7 @@ impl<R: Read, W: Write> Channel<R, W> {
         Ok(())
     }
     pub fn send_response<Resp: Serialize>(&mut self, resp: Resp) -> Result<(), IpcError> {
-        let serialized_resp = to_vec(&resp, false).map_err(|_| IpcError::SerializeError)?;
+        let serialized_resp = to_vec(&resp).map_err(|_| IpcError::SerializeError)?;
         let packet = ResponsePacket::new(0, serialized_resp);
         #[cfg(feature = "enable-logging")]
         log::info!("send response: {:?}", packet);
@@ -173,7 +173,7 @@ impl<R: Read, W: Write> Channel<R, W> {
         let packet = RequestPacket::read_from(&mut self.reader)?;
         #[cfg(feature = "enable-logging")]
         log::info!("receive request: {:?}", packet);
-        let req = from_slice(packet.payload(), false).map_err(|_| IpcError::DeserializeError)?;
+        let req = from_slice(packet.payload()).map_err(|_| IpcError::DeserializeError)?;
         Ok(req)
     }
     pub fn receive_response<Resp: for<'de> Deserialize<'de>>(&mut self) -> Result<Resp, IpcError> {
@@ -191,6 +191,6 @@ impl<R: Read, W: Write> Channel<R, W> {
                 return Err(IpcError::ProtocolError(e));
             }
         }
-        from_slice(packet.payload(), false).map_err(|_| IpcError::DeserializeError)
+        from_slice(packet.payload()).map_err(|_| IpcError::DeserializeError)
     }
 }
