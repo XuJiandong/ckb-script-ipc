@@ -2,6 +2,7 @@
 
 use alloc::{collections::btree_map::BTreeMap, string::String, vec::Vec};
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Default, Debug)]
 pub struct Struct0 {
@@ -10,12 +11,14 @@ pub struct Struct0 {
     pub f2: [u8; 3],
 }
 
+#[serde_as]
 #[derive(Serialize, Deserialize, Clone, PartialEq, Default, Debug)]
 pub struct Struct1 {
     pub f1: u8,
     pub f2: u16,
     pub f3: [u8; 3],
     pub f4: [[u8; 5]; 2],
+    #[serde_as(as = "serde_with::hex::Hex")]
     pub f5: Vec<u8>,
     pub f6: String,
     pub f7: Option<u32>,
