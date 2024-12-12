@@ -1,4 +1,7 @@
 #![allow(clippy::too_many_arguments)]
+#![no_std]
+
+extern crate alloc;
 
 use alloc::{collections::btree_map::BTreeMap, string::String, vec::Vec};
 use serde::{Deserialize, Serialize};

@@ -5,7 +5,6 @@
 extern crate alloc;
 
 pub mod client_entry;
-pub mod def;
 pub mod entry;
 pub mod error;
 pub mod server_entry;

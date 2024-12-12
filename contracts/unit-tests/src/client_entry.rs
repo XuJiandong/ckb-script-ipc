@@ -1,11 +1,8 @@
+use crate::error::Error;
 use alloc::{collections::BTreeMap, ffi::CString, string::ToString, vec};
 use ckb_script_ipc_common::spawn::spawn_server;
 use ckb_std::{ckb_constants::Source, log::info};
-
-use crate::{
-    def::{Struct0, Struct1, UnitTestsClient},
-    error::Error,
-};
+use unit_tests_def::{Struct0, Struct1, UnitTestsClient};
 
 pub fn client_entry() -> Result<(), Error> {
     let (read_pipe, write_pipe) = spawn_server(

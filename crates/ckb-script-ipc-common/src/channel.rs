@@ -161,7 +161,7 @@ impl<R: Read, W: Write> Channel<R, W> {
         Ok(())
     }
     pub fn send_error_code(&mut self, error_code: ProtocolErrorCode) -> Result<(), IpcError> {
-        let packet = ResponsePacket::new(error_code as u64, vec![]);
+        let packet = ResponsePacket::new(error_code.clone() as u64, vec![]);
         #[cfg(feature = "enable-logging")]
         log::info!("send error code: {:?}", error_code as u64);
         let bytes = packet.serialize();

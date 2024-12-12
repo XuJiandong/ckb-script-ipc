@@ -33,7 +33,12 @@ pub struct RequestPacket {
 
 impl Debug for RequestPacket {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "RequestPacket, payload: {}", hex::encode(&self.payload))
+        write!(
+            f,
+            "RequestPacket, {} bytes payload: {}",
+            self.payload.len(),
+            hex::encode(&self.payload)
+        )
     }
 }
 
@@ -91,8 +96,9 @@ impl Debug for ResponsePacket {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(
             f,
-            "ResponsePacket, error_code: {}, payload: {}",
+            "ResponsePacket, error_code: {}, {} bytes payload: {}",
             self.error_code,
+            self.payload.len(),
             hex::encode(&self.payload)
         )
     }
