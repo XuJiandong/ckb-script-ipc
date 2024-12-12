@@ -40,9 +40,10 @@ impl<Mac: SupportMachine> Syscalls<Mac> for DebugSyscall {
 
         // in native implementation, we don't support these syscalls
         if code == SPAWN || code == WAIT || code == PROCESS_ID || code == PIPE {
-            return Err(ckb_vm::error::Error::Unexpected(
-                "unsupported syscalls: spawn, wait, process_id and pipe".into(),
-            ));
+            return Err(ckb_vm::error::Error::IO {
+                kind: std::io::ErrorKind::Other,
+                data: "unsupported syscalls: spawn, wait, process_id and pipe".into(),
+            });
         }
         if code != DEBUG_PRINT_SYSCALL_NUMBER {
             return Ok(false);
@@ -91,9 +92,10 @@ impl<Mac: SupportMachine> Syscalls<Mac> for ReadSyscall {
         }
         let fd = machine.registers()[A0].to_u64();
         if fd != FIRST_FD_SLOT {
-            return Err(ckb_vm::error::Error::Unexpected(
-                "can only read on pipe 2".into(),
-            ));
+            return Err(ckb_vm::error::Error::IO {
+                kind: std::io::ErrorKind::Other,
+                data: "can only read on pipe 2".into(),
+            });
         }
         let buffer_addr = machine.registers()[A1].clone();
         let length_addr = machine.registers()[A2].clone();
@@ -102,7 +104,10 @@ impl<Mac: SupportMachine> Syscalls<Mac> for ReadSyscall {
         let real_len = self
             .pipe
             .read(&mut buf)
-            .map_err(|_| ckb_vm::error::Error::Unexpected("READ error".into()))?;
+            .map_err(|_| ckb_vm::error::Error::IO {
+                kind: std::io::ErrorKind::Other,
+                data: "READ error".into(),
+            })?;
         machine
             .memory_mut()
             .store_bytes(buffer_addr.to_u64(), &buf[..real_len])?;
@@ -139,9 +144,10 @@ impl<Mac: SupportMachine> Syscalls<Mac> for WriteSyscall {
         }
         let fd = machine.registers()[A0].to_u64();
         if fd != (FIRST_FD_SLOT + 1) {
-            return Err(ckb_vm::error::Error::Unexpected(
-                "can only write on pipe 3".into(),
-            ));
+            return Err(ckb_vm::error::Error::IO {
+                kind: std::io::ErrorKind::Other,
+                data: "can only write on pipe 3".into(),
+            });
         }
         let buffer_addr = machine.registers()[A1].clone();
         let length_addr = machine.registers()[A2].clone();
@@ -159,7 +165,10 @@ impl<Mac: SupportMachine> Syscalls<Mac> for WriteSyscall {
         // the pipe write can't write partial data so we don't need to check result length.
         self.pipe
             .write(&bytes)
-            .map_err(|_| ckb_vm::error::Error::Unexpected("WRITE error".into()))?;
+            .map_err(|_| ckb_vm::error::Error::IO {
+                kind: std::io::ErrorKind::Other,
+                data: "WRITE error".into(),
+            })?;
 
         machine
             .memory_mut()
@@ -189,9 +198,10 @@ impl<Mac: SupportMachine> Syscalls<Mac> for InheritedFdSyscall {
 
         let length = machine.memory_mut().load64(&length_addr)?;
         if length.to_u64() < 2 {
-            return Err(ckb_vm::error::Error::Unexpected(
-                "length of inherited fd is less than 2".into(),
-            ));
+            return Err(ckb_vm::error::Error::IO {
+                kind: std::io::ErrorKind::Other,
+                data: "length of inherited fd is less than 2".into(),
+            });
         }
         let mut inherited_fd = [0u8; 16];
         inherited_fd[0..8].copy_from_slice(&FIRST_FD_SLOT.to_le_bytes());
@@ -226,6 +236,45 @@ impl<Mac: SupportMachine> Syscalls<Mac> for CloseSyscall {
     }
 }
 
+/// A bidirectional communication channel for transferring data between native code and CKB-VM.
+///
+/// `Pipe` implements a buffered channel that can be used for either reading or writing, but not both
+/// simultaneously. It uses a synchronous channel internally to ensure proper flow control.
+///
+/// # Structure
+/// * `tx` - Optional sender end of the channel
+/// * `rx` - Optional receiver end of the channel, wrapped in a mutex for thread safety
+/// * `buf` - Internal buffer for storing partially read data
+///
+/// # Examples
+/// ```ignore
+/// // Create a pipe pair for bidirectional communication
+/// let (pipe1, pipe2) = Pipe::new_pair();
+///
+/// // Write to pipe2
+/// pipe2.write(b"hello")?;
+///
+/// // Read from pipe1
+/// let mut buf = vec![0; 5];
+/// let n = pipe1.read(&mut buf)?;
+/// assert_eq!(&buf[..n], b"hello");
+/// ```
+///
+/// # Implementation Details
+/// - The pipe uses a zero-capacity channel (`sync_channel(0)`), making all write operations
+///   synchronous
+/// - Reading is buffered: data is read from the channel into an internal buffer and then
+///   served from there
+/// - Either `tx` or `rx` will be `Some`, but never both, determining whether the pipe is
+///   for reading or writing
+///
+/// # Thread Safety
+/// - The receiver is wrapped in a `Mutex` to ensure thread-safe access
+/// - The sender is naturally thread-safe through `SyncSender`
+///
+/// # Resource Management
+/// The pipe automatically closes when dropped, ensuring proper cleanup of system resources.
+///
 pub struct Pipe {
     tx: Option<SyncSender<Vec<u8>>>,
     rx: Option<Mutex<Receiver<Vec<u8>>>>,
@@ -265,7 +314,9 @@ impl Read for Pipe {
                 match rx.lock().unwrap().recv() {
                     Ok(data) => self.buf = data,
                     Err(_) => {
-                        return Err(Error::new(ErrorKind::UnexpectedEof, "channel is closed"))
+                        #[cfg(feature = "enable-logging")]
+                        log::info!("Pipe Read: channel is closed");
+                        return Err(Error::new(ErrorKind::Other, "channel is closed"));
                     }
                 }
             } else {
@@ -288,10 +339,18 @@ impl Write for Pipe {
         if buf.is_empty() {
             return Ok(0);
         }
-        self.tx.as_mut().unwrap().send(buf.to_vec()).unwrap();
-        #[cfg(feature = "enable-logging")]
-        log::info!("Pipe Write: write {} bytes", buf.len());
-        Ok(buf.len())
+        match self.tx.as_mut().unwrap().send(buf.to_vec()) {
+            Ok(_) => {
+                #[cfg(feature = "enable-logging")]
+                log::info!("Pipe Write: write {} bytes", buf.len());
+                Ok(buf.len())
+            }
+            Err(e) => {
+                #[cfg(feature = "enable-logging")]
+                log::error!("Pipe Write: channel is closed {:?}", e);
+                Err(Error::new(ErrorKind::Other, "channel is closed"))
+            }
+        }
     }
 
     fn flush(&mut self) -> Result<(), Error> {
@@ -330,7 +389,45 @@ fn main_int(
     );
     Ok(())
 }
-
+/// Spawns a new CKB-VM instance running the provided script binary in a
+/// separate thread with bidirectional communication channels.
+///
+/// This function creates two pipes for bidirectional communication between the
+/// native code and the CKB-VM instance:
+/// - One pipe for sending data from native code to CKB-VM
+/// - One pipe for receiving data from CKB-VM to native code
+///
+/// # Arguments
+///
+/// * `script_binary` - A byte slice containing the RISC-V binary to be executed
+///   in CKB-VM
+/// * `args` - A slice of string arguments to be passed to the script binary
+///
+/// # Returns
+///
+/// Returns a `Result` containing a tuple of two `Pipe`s on success:
+/// - The first `Pipe` is for reading data from the CKB-VM instance
+/// - The second `Pipe` is for writing data to the CKB-VM instance
+///
+/// # Errors
+///
+/// Returns a boxed error if the thread creation or VM initialization fails.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// let binary = include_bytes!("path/to/binary");
+/// let args = &["arg1", "arg2"];
+///
+/// let (read_pipe, write_pipe) = spawn_server(binary, args)?;
+/// // Now you can use read_pipe to receive data from the VM
+/// // and write_pipe to send data to the VM
+/// ```
+/// # Note
+/// The VM thread will be terminated when either:
+/// - Both `read_pipe` and `write_pipe` are dropped, causing the communication channels to close
+/// - The VM execution completes naturally
+/// - An unrecoverable error occurs in the VM
 pub fn spawn_server(
     script_binary: &[u8],
     args: &[&str],
@@ -345,7 +442,6 @@ pub fn spawn_server(
         .iter()
         .map(|s| Bytes::copy_from_slice(s.as_bytes()))
         .collect();
-    // TODO: shutdown service gracefully.
     std::thread::spawn(move || {
         let _ = main_int(code, args, read_pipe2, write_pipe1);
     });
