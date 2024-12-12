@@ -4,8 +4,8 @@ use core::fmt::{Debug, Formatter, Result as FmtResult};
 use hex;
 
 use crate::error::IpcError;
+use crate::io::Read;
 use crate::vlq::{vlq_decode, vlq_encode};
-use ckb_rust_std::io::Read;
 
 /// The `Packet` trait defines the interface for handling packets in an IPC context.
 /// Types implementing this trait can be used to represent and manipulate packets.

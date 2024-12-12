@@ -1,10 +1,10 @@
+use crate::io::{BufReader, BufWriter, Read, Write};
 use crate::{
     error::{IpcError, ProtocolErrorCode},
     ipc::Serve,
     packet::{Packet, RequestPacket, ResponsePacket},
 };
 use alloc::vec;
-use ckb_rust_std::io::{BufReader, BufWriter, Read, Write};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, to_vec};
 
