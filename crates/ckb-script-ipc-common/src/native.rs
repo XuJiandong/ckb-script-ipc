@@ -334,7 +334,7 @@ fn main_int(
 pub fn spawn_server(
     script_binary: &[u8],
     args: &[&str],
-) -> Result<(Pipe, Pipe), Box<dyn core::error::Error>> {
+) -> Result<(Pipe, Pipe), Box<dyn std::error::Error>> {
     // channel: ckb-vm -> native
     let (read_pipe1, write_pipe1) = Pipe::new_pair();
     // channel: native -> ckb-vm
