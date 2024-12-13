@@ -64,7 +64,7 @@ impl<Mac: SupportMachine> Syscalls<Mac> for DebugSyscall {
             addr += 1;
         }
 
-        let s = String::from_utf8(buffer).unwrap();
+        let s = String::from_utf8_lossy(&buffer);
         std::println!("{:?}", s);
         machine.set_register(A0, Mac::REG::from_u8(0));
         Ok(true)
@@ -310,20 +310,15 @@ impl Pipe {
 impl Read for Pipe {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         if self.buf.is_empty() {
-            if let Some(rx) = &self.rx {
-                match rx.lock().unwrap().recv() {
-                    Ok(data) => self.buf = data,
-                    Err(_) => {
-                        #[cfg(feature = "enable-logging")]
-                        log::info!("Pipe Read: channel is closed");
-                        return Err(Error::new(ErrorKind::Other, "channel is closed"));
-                    }
+            match self.rx.as_mut().unwrap().lock().unwrap().recv() {
+                Ok(data) => self.buf = data,
+                Err(_) => {
+                    #[cfg(feature = "enable-logging")]
+                    log::info!("Pipe Read: channel is closed");
+                    return Err(Error::new(ErrorKind::Other, "channel is closed"));
                 }
-            } else {
-                panic!("rx is none");
             }
         }
-
         let len = self.buf.len().min(buf.len());
         buf[..len].copy_from_slice(&self.buf[..len]);
         self.buf = self.buf.split_off(len);
