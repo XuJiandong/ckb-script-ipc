@@ -51,4 +51,5 @@ pub trait UnitTests {
 
     fn test_complex_types(arg1: Struct1);
     fn test_return_types() -> Result<u32, String>;
+    fn test_large_input_output(input: Vec<u8>) -> Vec<u8>;
 }

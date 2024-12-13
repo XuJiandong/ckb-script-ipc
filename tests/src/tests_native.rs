@@ -43,4 +43,7 @@ fn test_native_stress() {
     for _ in 0..100 {
         client.test_primitive_types(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, true);
     }
+    let input = vec![0; 16 * 1024];
+    let output = client.test_large_input_output(input.clone());
+    assert_eq!(output, input.into_iter().map(|x| x + 1).collect::<Vec<_>>());
 }

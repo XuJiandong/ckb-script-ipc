@@ -27,7 +27,7 @@ pub const SPAWN_YIELD_CYCLES_BASE: u64 = 800;
 
 pub const FIRST_FD_SLOT: u64 = 2;
 
-pub struct DebugSyscall {}
+struct DebugSyscall {}
 
 impl<Mac: SupportMachine> Syscalls<Mac> for DebugSyscall {
     fn initialize(&mut self, _machine: &mut Mac) -> Result<(), ckb_vm::error::Error> {
@@ -70,7 +70,7 @@ impl<Mac: SupportMachine> Syscalls<Mac> for DebugSyscall {
         Ok(true)
     }
 }
-pub struct ReadSyscall {
+struct ReadSyscall {
     pipe: Pipe,
 }
 
@@ -122,7 +122,7 @@ impl<Mac: SupportMachine> Syscalls<Mac> for ReadSyscall {
     }
 }
 
-pub struct WriteSyscall {
+struct WriteSyscall {
     pipe: Pipe,
 }
 
@@ -181,7 +181,7 @@ impl<Mac: SupportMachine> Syscalls<Mac> for WriteSyscall {
     }
 }
 
-pub struct InheritedFdSyscall {}
+struct InheritedFdSyscall {}
 
 impl<Mac: SupportMachine> Syscalls<Mac> for InheritedFdSyscall {
     fn initialize(&mut self, _machine: &mut Mac) -> Result<(), ckb_vm::error::Error> {
@@ -219,7 +219,7 @@ impl<Mac: SupportMachine> Syscalls<Mac> for InheritedFdSyscall {
     }
 }
 
-pub struct CloseSyscall {}
+struct CloseSyscall {}
 
 impl<Mac: SupportMachine> Syscalls<Mac> for CloseSyscall {
     fn initialize(&mut self, _machine: &mut Mac) -> Result<(), ckb_vm::error::Error> {

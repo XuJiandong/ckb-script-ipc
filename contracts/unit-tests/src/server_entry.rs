@@ -79,6 +79,9 @@ impl UnitTests for UnitTestsServer {
             Err("An error occurred".to_string())
         }
     }
+    fn test_large_input_output(&mut self, input: Vec<u8>) -> Vec<u8> {
+        input.into_iter().map(|x| x + 1).collect()
+    }
 }
 
 pub fn server_entry() -> Result<(), Error> {
