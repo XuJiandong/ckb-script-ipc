@@ -4,6 +4,7 @@ use crate::{
     ipc::Serve,
     packet::{Packet, RequestPacket, ResponsePacket},
 };
+use alloc::string::String;
 use alloc::vec;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, to_vec};
@@ -149,6 +150,16 @@ impl<R: Read, W: Write> Channel<R, W> {
         self.writer.flush()?;
         Ok(())
     }
+    pub fn send_json_request(&mut self, json: &str) -> Result<(), IpcError> {
+        let packet = RequestPacket::new(json.as_bytes().to_vec());
+        #[cfg(feature = "enable-logging")]
+        log::info!("send request: {:?}", packet);
+
+        let bytes = packet.serialize();
+        self.writer.write(&bytes)?;
+        self.writer.flush()?;
+        Ok(())
+    }
     pub fn send_response<Resp: Serialize>(&mut self, resp: Resp) -> Result<(), IpcError> {
         let serialized_resp = to_vec(&resp).map_err(|_| IpcError::SerializeError)?;
         let packet = ResponsePacket::new(0, serialized_resp);
@@ -192,5 +203,22 @@ impl<R: Read, W: Write> Channel<R, W> {
             }
         }
         from_slice(packet.payload()).map_err(|_| IpcError::DeserializeError)
+    }
+    pub fn receive_json_response(&mut self) -> Result<String, IpcError> {
+        let packet = ResponsePacket::read_from(&mut self.reader)?;
+
+        #[cfg(feature = "enable-logging")]
+        log::info!("Received response: {:?}", packet);
+
+        let error_code = ProtocolErrorCode::from(packet.error_code());
+        match error_code {
+            ProtocolErrorCode::Ok => {}
+            e => {
+                #[cfg(feature = "enable-logging")]
+                log::error!("Received error code: {:?}", e);
+                return Err(IpcError::ProtocolError(e));
+            }
+        }
+        Ok(String::from_utf8_lossy(packet.payload()).into_owned())
     }
 }

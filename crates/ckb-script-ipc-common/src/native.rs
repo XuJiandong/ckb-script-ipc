@@ -9,7 +9,7 @@ use std::sync::Mutex;
 
 use ckb_vm::cost_model::estimate_cycles;
 use ckb_vm::registers::{A0, A1, A2, A7};
-use ckb_vm::{Bytes, CoreMachine, Memory, Register, SupportMachine, Syscalls};
+use ckb_vm::{Bytes, Memory, Register, SupportMachine, Syscalls};
 
 use crate::io::{Error, ErrorKind, Read, Write};
 
@@ -348,6 +348,7 @@ impl Write for Pipe {
             Err(e) => {
                 #[cfg(feature = "enable-logging")]
                 log::error!("Pipe Write: channel is closed {:?}", e);
+                drop(e);
                 Err(Error::new(ErrorKind::Other, "channel is closed"))
             }
         }
@@ -379,12 +380,13 @@ fn main_int(
         .syscall(Box::new(CloseSyscall {}))
         .build();
     machine.load_program(&code, &args)?;
-    let exit = machine.run();
-    let cycles = machine.cycles();
+    let _exit = machine.run();
+    let _cycles = machine.cycles();
+    #[cfg(feature = "enable-logging")]
     std::println!(
         "int exit={:?} cycles={:?} r[a1]={:?}",
-        exit,
-        cycles,
+        _exit,
+        _cycles,
         machine.registers()[ckb_vm::registers::A1]
     );
     Ok(())

@@ -2,7 +2,6 @@ use crate::def::World;
 use crate::error::Error;
 use alloc::{format, string::String};
 use ckb_script_ipc_common::spawn::run_server;
-use ckb_std::log::info;
 
 struct WorldServer;
 
@@ -24,7 +23,6 @@ impl World for WorldServer {
 }
 
 pub fn server_entry() -> Result<(), Error> {
-    info!("server started");
     let world = WorldServer::new();
     run_server(world.server()).map_err(|_| Error::ServerError)
 }

@@ -1,9 +1,8 @@
-use ckb_script_ipc_common::native::spawn_server;
+use ckb_script_ipc_common::{channel::Channel, native::spawn_server};
 use unit_tests_def::UnitTestsClient;
 
 #[test]
 fn test_native() {
-    env_logger::init();
     let script_binary = std::fs::read("../build/release/unit-tests").unwrap();
     let (read_pipe, write_pipe) = spawn_server(&script_binary, &["server_entry"]).unwrap();
 
@@ -18,4 +17,19 @@ fn test_native() {
 
     let result = client.test_return_types();
     assert_eq!(result, Ok(42));
+}
+
+#[test]
+fn test_native_json() {
+    let script_binary = std::fs::read("../build/release/unit-tests").unwrap();
+    let (read_pipe, write_pipe) = spawn_server(&script_binary, &["server_entry"]).unwrap();
+
+    // directly call with json
+    let json = r#"
+    {"TestPrimitiveTypes":{"arg1":1,"arg2":2,"arg3":3,"arg4":4,"arg5":5,"arg6":6,"arg7":7,"arg8":8,"arg9":9,"arg10":10,"arg11":true}}
+    "#;
+    let mut channel = Channel::new(read_pipe, write_pipe);
+    channel.send_json_request(json).unwrap();
+    let response = channel.receive_json_response().unwrap();
+    assert_eq!(response, "{\"TestPrimitiveTypes\":null}");
 }

@@ -88,7 +88,6 @@ fn unit_test_ckb_blake2b(crypto_info: CryptoInfo) -> i8 {
         );
         1
     } else {
-        info!("check ckb blake2b success");
         0
     }
 }
@@ -167,7 +166,6 @@ fn unit_test_ripemd160(crypto_info: CryptoInfo) -> i8 {
         );
         1
     } else {
-        info!("check ripemd160 success");
         0
     }
 }
@@ -294,7 +292,6 @@ fn unit_test_ed25519_verify(crypto_info: CryptoInfo) -> i8 {
 
 pub fn program_entry() -> i8 {
     drop(ckb_std::logger::init());
-    info!("unit-tests-crypto started");
 
     let info = CryptoInfo::new();
 

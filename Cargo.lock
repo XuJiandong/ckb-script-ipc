@@ -587,7 +587,6 @@ dependencies = [
  "ckb-std",
  "ckb-vm",
  "enumn",
- "hex",
  "log",
  "serde",
  "serde_json",

@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 ckb-std = { version = "0.16", default-features = false, features = ["allocator", "ckb-types", "dummy-atomic", "log"]}
-ckb-script-ipc-common = { path = "../../crates/ckb-script-ipc-common", features = ["enable-logging"] }
+ckb-script-ipc-common = { path = "../../crates/ckb-script-ipc-common" }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 ckb-script-ipc = { path = "../../crates/ckb-script-ipc" }
 serde_json = { version = "1.0.133", default-features = false, features = ["alloc"] }

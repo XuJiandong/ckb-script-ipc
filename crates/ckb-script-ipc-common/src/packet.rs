@@ -1,7 +1,7 @@
+use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt::{Debug, Formatter, Result as FmtResult};
-use hex;
 
 use crate::error::IpcError;
 use crate::io::Read;
@@ -37,7 +37,7 @@ impl Debug for RequestPacket {
             f,
             "RequestPacket, {} bytes payload: {}",
             self.payload.len(),
-            hex::encode(&self.payload)
+            String::from_utf8_lossy(&self.payload)
         )
     }
 }
@@ -99,7 +99,7 @@ impl Debug for ResponsePacket {
             "ResponsePacket, error_code: {}, {} bytes payload: {}",
             self.error_code,
             self.payload.len(),
-            hex::encode(&self.payload)
+            String::from_utf8_lossy(&self.payload)
         )
     }
 }
