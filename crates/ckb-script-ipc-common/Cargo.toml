@@ -24,3 +24,8 @@ ckb-vm = { version = "0.24.12", optional = true }
 default = []
 enable-logging = ["log"]
 std = ["ckb-vm"]
+asm = ["ckb-vm/asm"]
+detect-asm = ["ckb-vm/detect-asm"]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(has_asm)'] }

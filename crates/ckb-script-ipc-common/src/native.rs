@@ -359,7 +359,36 @@ impl Write for Pipe {
     }
 }
 
-fn main_int(
+#[cfg(has_asm)]
+fn ckb_vm_entry(
+    code: Bytes,
+    args: Vec<Bytes>,
+    read_pipe: Pipe,
+    write_pipe: Pipe,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let asm_core = ckb_vm::machine::asm::AsmCoreMachine::new(
+        ckb_vm::ISA_IMC | ckb_vm::ISA_B | ckb_vm::ISA_MOP,
+        ckb_vm::machine::VERSION2,
+        u64::MAX,
+    );
+    let core = ckb_vm::DefaultMachineBuilder::new(asm_core)
+        .instruction_cycle_func(Box::new(estimate_cycles))
+        .syscall(Box::new(DebugSyscall {}))
+        .syscall(Box::new(ReadSyscall::new(read_pipe)))
+        .syscall(Box::new(WriteSyscall::new(write_pipe)))
+        .syscall(Box::new(InheritedFdSyscall {}))
+        .syscall(Box::new(CloseSyscall {}))
+        .syscall(Box::new(DebugSyscall {}))
+        .build();
+    let mut machine = ckb_vm::machine::asm::AsmMachine::new(core);
+    machine.load_program(&code, &args)?;
+    let _exit = machine.run();
+    let _cycles = machine.machine.cycles();
+    Ok(())
+}
+
+#[cfg(not(has_asm))]
+fn ckb_vm_entry(
     code: Bytes,
     args: Vec<Bytes>,
     read_pipe: Pipe,
@@ -373,6 +402,7 @@ fn main_int(
     let machine_builder = ckb_vm::DefaultMachineBuilder::new(core_machine)
         .instruction_cycle_func(Box::new(estimate_cycles));
     let mut machine = machine_builder
+        .instruction_cycle_func(Box::new(estimate_cycles))
         .syscall(Box::new(DebugSyscall {}))
         .syscall(Box::new(ReadSyscall::new(read_pipe)))
         .syscall(Box::new(WriteSyscall::new(write_pipe)))
@@ -382,13 +412,6 @@ fn main_int(
     machine.load_program(&code, &args)?;
     let _exit = machine.run();
     let _cycles = machine.cycles();
-    #[cfg(feature = "enable-logging")]
-    std::println!(
-        "int exit={:?} cycles={:?} r[a1]={:?}",
-        _exit,
-        _cycles,
-        machine.registers()[ckb_vm::registers::A1]
-    );
     Ok(())
 }
 /// Spawns a new CKB-VM instance running the provided script binary in a
@@ -445,7 +468,7 @@ pub fn spawn_server(
         .map(|s| Bytes::copy_from_slice(s.as_bytes()))
         .collect();
     std::thread::spawn(move || {
-        let _ = main_int(code, args, read_pipe2, write_pipe1);
+        let _ = ckb_vm_entry(code, args, read_pipe2, write_pipe1);
     });
     Ok((read_pipe1, write_pipe2))
 }
