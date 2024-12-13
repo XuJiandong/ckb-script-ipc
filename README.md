@@ -118,7 +118,7 @@ Here's how to interact with these services from off-chain native code:
    client.test_primitive_types(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, true);
    ```
 
-Note: Steps 2 and 3 are executed on the native machine (off-chain).
+Note: Steps 2 and 3 are executed on the native machine (off-chain). See full example in [test](./tests/src/tests_native.rs).
 
 ## Wire format
 ### Concept of Packet

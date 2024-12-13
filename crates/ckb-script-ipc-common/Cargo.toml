@@ -23,7 +23,7 @@ ckb-vm = { version = "0.24.12", optional = true }
 [features]
 default = []
 enable-logging = ["log"]
-std = ["ckb-vm"]
+std = ["ckb-vm", "detect-asm"]
 asm = ["ckb-vm/asm"]
 detect-asm = ["ckb-vm/detect-asm"]
 

@@ -139,7 +139,7 @@ impl<R: Read, W: Write> Channel<R, W> {
             }
         }
     }
-    pub fn send_request<Req: Serialize>(&mut self, req: Req) -> Result<(), IpcError> {
+    pub(crate) fn send_request<Req: Serialize>(&mut self, req: Req) -> Result<(), IpcError> {
         let serialized_req = to_vec(&req).map_err(|_| IpcError::SerializeError)?;
         let packet = RequestPacket::new(serialized_req);
         #[cfg(feature = "enable-logging")]
@@ -150,6 +150,21 @@ impl<R: Read, W: Write> Channel<R, W> {
         self.writer.flush()?;
         Ok(())
     }
+
+    /// Sends a raw JSON string request to the server.
+    ///
+    /// This function takes a JSON string and sends it directly as a request packet to the server,
+    /// without performing any serialization. This is useful when working with raw JSON data that
+    /// doesn't need to be converted from Rust types.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - A string slice containing the JSON request to be sent.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` indicating whether the request was successfully sent, or an `IpcError` if
+    /// writing to the channel fails.
     pub fn send_json_request(&mut self, json: &str) -> Result<(), IpcError> {
         let packet = RequestPacket::new(json.as_bytes().to_vec());
         #[cfg(feature = "enable-logging")]
@@ -160,7 +175,7 @@ impl<R: Read, W: Write> Channel<R, W> {
         self.writer.flush()?;
         Ok(())
     }
-    pub fn send_response<Resp: Serialize>(&mut self, resp: Resp) -> Result<(), IpcError> {
+    pub(crate) fn send_response<Resp: Serialize>(&mut self, resp: Resp) -> Result<(), IpcError> {
         let serialized_resp = to_vec(&resp).map_err(|_| IpcError::SerializeError)?;
         let packet = ResponsePacket::new(0, serialized_resp);
         #[cfg(feature = "enable-logging")]
@@ -171,7 +186,10 @@ impl<R: Read, W: Write> Channel<R, W> {
         self.writer.flush()?;
         Ok(())
     }
-    pub fn send_error_code(&mut self, error_code: ProtocolErrorCode) -> Result<(), IpcError> {
+    pub(crate) fn send_error_code(
+        &mut self,
+        error_code: ProtocolErrorCode,
+    ) -> Result<(), IpcError> {
         let packet = ResponsePacket::new(error_code.clone() as u64, vec![]);
         #[cfg(feature = "enable-logging")]
         log::info!("send error code: {:?}", error_code as u64);
@@ -180,14 +198,18 @@ impl<R: Read, W: Write> Channel<R, W> {
         self.writer.flush()?;
         Ok(())
     }
-    pub fn receive_request<Req: for<'de> Deserialize<'de>>(&mut self) -> Result<Req, IpcError> {
+    pub(crate) fn receive_request<Req: for<'de> Deserialize<'de>>(
+        &mut self,
+    ) -> Result<Req, IpcError> {
         let packet = RequestPacket::read_from(&mut self.reader)?;
         #[cfg(feature = "enable-logging")]
         log::info!("receive request: {:?}", packet);
         let req = from_slice(packet.payload()).map_err(|_| IpcError::DeserializeError)?;
         Ok(req)
     }
-    pub fn receive_response<Resp: for<'de> Deserialize<'de>>(&mut self) -> Result<Resp, IpcError> {
+    pub(crate) fn receive_response<Resp: for<'de> Deserialize<'de>>(
+        &mut self,
+    ) -> Result<Resp, IpcError> {
         let packet = ResponsePacket::read_from(&mut self.reader)?;
 
         #[cfg(feature = "enable-logging")]
@@ -204,6 +226,21 @@ impl<R: Read, W: Write> Channel<R, W> {
         }
         from_slice(packet.payload()).map_err(|_| IpcError::DeserializeError)
     }
+
+    /// Receives a JSON string response from the server.
+    ///
+    /// This function reads a response packet from the server and returns its payload as a String,
+    /// without attempting to deserialize it into a specific type. This is useful when working
+    /// with raw JSON responses that don't need to be converted into specific Rust types.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(String)` - A String containing the JSON response if successful
+    /// * `Err(IpcError)` - An error if:
+    ///   - Reading from the channel fails
+    ///   - The server returns an error code
+    ///   - The response payload contains invalid UTF-8
+    ///
     pub fn receive_json_response(&mut self) -> Result<String, IpcError> {
         let packet = ResponsePacket::read_from(&mut self.reader)?;
 

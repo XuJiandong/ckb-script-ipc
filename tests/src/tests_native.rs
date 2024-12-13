@@ -33,3 +33,14 @@ fn test_native_json() {
     let response = channel.receive_json_response().unwrap();
     assert_eq!(response, "{\"TestPrimitiveTypes\":null}");
 }
+
+#[test]
+fn test_native_stress() {
+    let script_binary = std::fs::read("../build/release/unit-tests").unwrap();
+    let (read_pipe, write_pipe) = spawn_server(&script_binary, &["server_entry"]).unwrap();
+
+    let mut client = UnitTestsClient::new(read_pipe, write_pipe);
+    for _ in 0..100 {
+        client.test_primitive_types(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, true);
+    }
+}
