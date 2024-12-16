@@ -310,7 +310,7 @@ impl Pipe {
 impl Read for Pipe {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         if self.buf.is_empty() {
-            match self.rx.as_mut().unwrap().lock().unwrap().recv() {
+            match self.rx.as_ref().unwrap().lock().unwrap().recv() {
                 Ok(data) => self.buf = data,
                 Err(_) => {
                     #[cfg(feature = "enable-logging")]
