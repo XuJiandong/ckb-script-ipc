@@ -315,7 +315,8 @@ impl Read for Pipe {
                 Err(_) => {
                     #[cfg(feature = "enable-logging")]
                     log::info!("Pipe Read: channel is closed");
-                    return Err(Error::new(ErrorKind::Other, "channel is closed"));
+                    // if channel is closed, return EOF
+                    return Ok(0);
                 }
             }
         }
