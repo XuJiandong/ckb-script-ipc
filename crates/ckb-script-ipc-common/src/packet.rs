@@ -1,11 +1,11 @@
+use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt::{Debug, Formatter, Result as FmtResult};
-use hex;
 
 use crate::error::IpcError;
+use crate::io::Read;
 use crate::vlq::{vlq_decode, vlq_encode};
-use ckb_rust_std::io::Read;
 
 /// The `Packet` trait defines the interface for handling packets in an IPC context.
 /// Types implementing this trait can be used to represent and manipulate packets.
@@ -33,7 +33,12 @@ pub struct RequestPacket {
 
 impl Debug for RequestPacket {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "RequestPacket, payload: {}", hex::encode(&self.payload))
+        write!(
+            f,
+            "RequestPacket, {} bytes payload: {}",
+            self.payload.len(),
+            String::from_utf8_lossy(&self.payload)
+        )
     }
 }
 
@@ -91,9 +96,10 @@ impl Debug for ResponsePacket {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(
             f,
-            "ResponsePacket, error_code: {}, payload: {}",
+            "ResponsePacket, error_code: {}, {} bytes payload: {}",
             self.error_code,
-            hex::encode(&self.payload)
+            self.payload.len(),
+            String::from_utf8_lossy(&self.payload)
         )
     }
 }

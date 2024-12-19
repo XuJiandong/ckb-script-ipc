@@ -7,10 +7,8 @@ use alloc::{
 use ckb_script_ipc_common::{channel::Channel, pipe::Pipe};
 use ckb_std::high_level::inherited_fds;
 
-use crate::{
-    def::{Struct0, Struct1, UnitTests},
-    error::Error,
-};
+use crate::error::Error;
+use unit_tests_def::{Struct0, Struct1, UnitTests};
 
 struct UnitTestsServer;
 
@@ -80,6 +78,9 @@ impl UnitTests for UnitTestsServer {
         } else {
             Err("An error occurred".to_string())
         }
+    }
+    fn test_large_input_output(&mut self, input: Vec<u8>) -> Vec<u8> {
+        input.into_iter().map(|x| x + 1).collect()
     }
 }
 

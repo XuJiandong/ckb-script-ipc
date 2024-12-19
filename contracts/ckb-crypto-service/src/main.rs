@@ -14,7 +14,7 @@ default_alloc!();
 use alloc::{boxed::Box, collections::BTreeMap, vec::Vec};
 use ckb_crypto_interface::{CkbCrypto, CryptoError, HasherCtx, HasherType};
 use ckb_script_ipc_common::spawn::run_server;
-use ckb_std::log::{error, info};
+use ckb_std::log::error;
 
 trait Hasher {
     fn update(&mut self, data: &[u8]);
@@ -262,8 +262,6 @@ impl CkbCrypto for CryptoServer {
 
 pub fn program_entry() -> i8 {
     drop(ckb_std::logger::init());
-
-    info!("server started");
     let world = CryptoServer::new();
     let err = run_server(world.server());
 

@@ -9,4 +9,4 @@ ckb-script-ipc-common = { path = "../../crates/ckb-script-ipc-common" }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 ckb-script-ipc = { path = "../../crates/ckb-script-ipc" }
 serde_json = { version = "1.0.133", default-features = false, features = ["alloc"] }
-serde_with = { version = "3.11.0", default-features = false, features = ["hex", "macros"] }
+unit-tests-def = { path = "../../crates/unit-tests-def" }

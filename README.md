@@ -99,6 +99,27 @@ The `read_pipe`/`write_pipe` are passed into server from `spawn_server`.
 
 For a complete example, see [ckb-script-ipc-demo](https://github.com/XuJiandong/ckb-script-ipc/tree/main/contracts/ckb-script-ipc-demo).
 
+
+## On-chain Scripts Providing Off-chain Services
+On-chain scripts can provide services to both on-chain and off-chain components.
+Here's how to interact with these services from off-chain native code:
+
+1. Enable the `std` feature in `ckb-script-ipc-common`
+
+2. Initialize the server:
+   ```rust,ignore
+   let script_binary = std::fs::read("path/to/on-chain-script-binary").unwrap();
+   let (read_pipe, write_pipe) = ckb_script_ipc_common::native::spawn_server(&script_binary, &[]).unwrap();
+   ```
+
+3. Create and interact with the client:
+   ```rust,ignore
+   let mut client = UnitTestsClient::new(read_pipe, write_pipe);
+   client.test_primitive_types(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, true);
+   ```
+
+Note: Steps 2 and 3 are executed on the native machine (off-chain). See full example in [test](./tests/src/tests_native.rs).
+
 ## Wire format
 ### Concept of Packet
 

@@ -1,5 +1,4 @@
-use ckb_rust_std::io::{Error, ErrorKind};
-use ckb_rust_std::io::{Read, Write};
+use crate::io::{Error, ErrorKind, Read, Write};
 use ckb_std::syscalls::{read, write};
 
 pub struct Pipe {
