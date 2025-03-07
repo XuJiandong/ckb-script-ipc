@@ -1,6 +1,6 @@
 [package]
 name = "ckb-script-ipc-common"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 authors = ["Lyndon <lynndon@gmail.com>"]
 license = "MIT"
@@ -12,7 +12,7 @@ description = "Common utilities for CKB Script IPC."
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ckb-std = { version = "0.16", default-features = false, features = ["allocator", "ckb-types", "dummy-atomic"]}
+ckb-std = { version = "0.17", default-features = false, features = ["allocator", "ckb-types", "dummy-atomic"]}
 serde = { version = "1.0.208", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.133", default-features = false, features = ["alloc"] }
 log = { version = "0.4", optional = true, default-features = false }

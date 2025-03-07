@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 ckb-crypto-interface = { path = "../../crates/ckb-crypto-interface" }
-ckb-std = { version = "0.16", default-features = false, features = ["allocator", "ckb-types", "dummy-atomic", "log"] }
+ckb-std = { version = "0.17", default-features = false, features = ["allocator", "ckb-types", "dummy-atomic", "log"] }
 ckb-script-ipc-common = { path = "../../crates/ckb-script-ipc-common" }
 
 [features]
