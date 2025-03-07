@@ -1,6 +1,6 @@
 [package]
 name = "ckb-script-ipc"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 authors = ["Lyndon <lynndon@gmail.com>"]
 license = "MIT"
