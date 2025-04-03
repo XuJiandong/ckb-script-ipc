@@ -22,6 +22,8 @@ typedef enum CSIErrorCode {
     CSI_ERROR_RECEIVE_RESPONSE,
     CSI_ERROR_SEND_REQUEST,
     CSI_ERROR_SEND_RESPONSE,
+    CSI_ERROR_INHERITED_FDS,
+    CSI_ERROR_FIXED_MEMORY_NOT_ALIGNED,
 } CSIErrorCode;
 
 typedef void* (*CSIMalloc)(size_t len);
@@ -62,6 +64,8 @@ void csi_init_malloc(CSIMalloc malloc, CSIFree free);
  *       for the panic.
  */
 void csi_init_panic(CSIPanic panic);
+
+void csi_default_panic(int exit_code);
 
 /**
  * Read data interface
@@ -120,12 +124,31 @@ typedef struct CSIChannel {
  * @param response: Pointer to store the received response packet
  * @return 0 for success, non-zero for failure
  *
- * Note: The caller is responsible for freeing(csi_free) the response's payload
- * when it's no longer needed.
+ * Note: The caller is responsible for:
+ * - Freeing the response's payload using csi_free_response() when it's no longer needed
+ * - Allocating and freeing memory for the request payload
+ * - Ensuring the channel, request, and response pointers are valid
+ * - Checking the response's error_code for operation success/failure
  */
 int csi_call(CSIChannel* channel, const CSIRequestPacket* request, CSIResponsePacket* response);
 
-int csi_spawn_server(uint64_t index, uint64_t source, const char* argv[], int argc, CSIChannel* client_channel);
+/**
+ * Frees the payload memory allocated for a CSIResponsePacket, on client side only.
+ *
+ * This function must be called after using csi_call() to prevent memory leaks.
+ * The payload is allocated by csi_call() during response reception and must be
+ * freed by the caller when no longer needed.
+ *
+ * @param response: Pointer to the response packet whose payload will be freed.
+ *
+ */
+void csi_client_free_response_payload(CSIResponsePacket* response);
+
+/**
+ * This is a low level version of csi_spawn_cell_server. It can control on more details of the spawned process.
+ */
+int csi_spawn_server(uint64_t index, uint64_t source, size_t offset, size_t length, const char* argv[], int argc,
+                     CSIChannel* client_channel);
 int csi_spawn_cell_server(void* code_hash, uint64_t hash_type, const char* argv[], int argc,
                           CSIChannel* client_channel);
 
@@ -133,13 +156,31 @@ int csi_spawn_cell_server(void* code_hash, uint64_t hash_type, const char* argv[
  * Callback function type for handling IPC requests in the server.
  *
  * @param request: The incoming request packet containing the client's request data
- * @param response: The response packet to be filled with the server's response
+ * @param response: The response packet to be filled with the server's response. The callback function is responsible
+ * for:
+ *                 - Allocating memory for the response payload if needed
+ *                 - Populating the response data
+ *                 - Freeing any allocated memory for next loop.
+ *                 The response packet structure is managed by the server and persists throughout the request handling
+ * cycle. It remains valid until the next request processing iteration begins.
  * @return 0 for success, non-zero for failure
  *
  * This callback is called by csi_run_server for each incoming request.
  * The implementation should process the request and populate the response packet.
  */
 typedef int (*CSIServe)(const CSIRequestPacket* request, CSIResponsePacket* response);
+
+/**
+ * Allocates memory for the response payload in a CSIResponsePacket, on server side only.
+ *
+ * This function must be called within the `CSIServe` callback function to allocate
+ * memory for the response payload before populating it with data.
+ *
+ * @param response: Pointer to the response packet whose payload will be allocated, according to the payload_len.
+ *
+ * @note The allocated payload is freed automatically by the server.
+ */
+void csi_server_malloc_response_payload(CSIResponsePacket* response);
 
 /**
  * Runs the IPC server loop, processing incoming requests using the provided callback.

@@ -5,6 +5,7 @@ OPT_LEVEL ?= -O2
 CFLAGS = --target=riscv64 -march=rv64imc_zba_zbb_zbc_zbs
 CFLAGS += $(OPT_LEVEL) -fdata-sections -ffunction-sections
 CFLAGS += -I deps/ckb-c-stdlib/libc -I deps/ckb-c-stdlib
+CLFAGS += -DCKB_STDLIB_NO_SYSCALL_IMPL -DCKB_DECLARATION_ONLY
 
 all: out build/libckb-script-ipc.a
 

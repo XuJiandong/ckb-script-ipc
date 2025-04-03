@@ -1,5 +1,6 @@
 #include "ckb-script-ipc.h"
 #include "ckb_syscall_apis.h"
+#include "ckb_consts.h"
 
 #define MAX_VQL_LEN 10
 
@@ -29,25 +30,69 @@ typedef struct CSIContext {
     CSIPanic panic;
 } CSIContext;
 
-CSIContext g_csi_context;
+CSIContext g_csi_context = {0};
 
+/**
+ * Context for a fixed-size memory allocator that manages two equal-sized memory blocks.
+ *
+ * This allocator divides the provided buffer into two equal parts, allowing for
+ * allocation and deallocation of these two fixed-size blocks. Each block can be
+ * independently allocated and freed.
+ *
+ * @field buf   Pointer to the start of the memory buffer
+ * @field len   Total size of the memory buffer in bytes
+ * @field allocated Array tracking the allocation state of each block (true = allocated, false = free)
+ */
 typedef struct CSIMallocFixedContext {
-    void* buf;
-    size_t len;
-    bool freed;
+    void* buf;          // Base pointer to the memory buffer
+    size_t len;         // Total buffer size in bytes
+    bool allocated[2];  // Allocation state for each block (true = allocated, false = free)
 } CSIMallocFixedContext;
 
-CSIMallocFixedContext g_csi_malloc_context;
+CSIMallocFixedContext g_csi_malloc_context = {0};
 
 #define PANIC(e) g_csi_context.panic(e)
 int csi_vlq_encode(void* buf, size_t len, uint64_t value, size_t* out_len);
 int csi_vlq_decode(const void* buf, size_t len, uint64_t* value, size_t* out_len);
 int csi_read_next_vlq(CSIReader* reader, uint64_t* value);
 
+void* csi_malloc_on_fixed(size_t len) {
+    for (size_t index = 0; index < 2; index++) {
+        if ((g_csi_malloc_context.len / 2) < len) {
+            PANIC(CSI_ERROR_MALLOC_TOO_LARGE);
+        }
+        if (!g_csi_malloc_context.allocated[index]) {
+            g_csi_malloc_context.allocated[index] = true;
+            return g_csi_malloc_context.buf + g_csi_malloc_context.len / 2 * index;
+        }
+    }
+    return NULL;
+}
+
+void csi_free_on_fixed(void* ptr) {
+    for (size_t index = 0; index < 2; index++) {
+        if ((g_csi_malloc_context.buf + g_csi_malloc_context.len / 2 * index) == ptr) {
+            if (!g_csi_malloc_context.allocated[index]) {
+                PANIC(CSI_ERROR_DOUBLE_FREE);
+            }
+            g_csi_malloc_context.allocated[index] = false;
+            return;
+        }
+    }
+    PANIC(CSI_ERROR_FREE_WRONG_PTR);
+}
+
 void csi_init_fixed_memory(void* buf, size_t len) {
+    if (len % 2 != 0) {
+        PANIC(CSI_ERROR_FIXED_MEMORY_NOT_ALIGNED);
+    }
     g_csi_malloc_context.buf = buf;
     g_csi_malloc_context.len = len;
-    g_csi_malloc_context.freed = true;
+    g_csi_malloc_context.allocated[0] = false;
+    g_csi_malloc_context.allocated[1] = false;
+
+    g_csi_context.malloc = csi_malloc_on_fixed;
+    g_csi_context.free = csi_free_on_fixed;
 }
 
 void csi_init_malloc(CSIMalloc malloc, CSIFree free) {
@@ -57,33 +102,17 @@ void csi_init_malloc(CSIMalloc malloc, CSIFree free) {
 
 void csi_init_panic(CSIPanic panic) { g_csi_context.panic = panic; }
 
-void* csi_malloc_on_fixed(size_t len) {
-    if (!g_csi_malloc_context.freed) {
-        PANIC(CSI_ERROR_MALLOC);
-    }
-    if (g_csi_malloc_context.len < len) {
-        PANIC(CSI_ERROR_MALLOC_TOO_LARGE);
-    }
-    g_csi_malloc_context.freed = false;
-    return g_csi_malloc_context.buf;
+void csi_default_panic(int exit_code) {
+    printf("ckb-script-ipc panic exit_code = %d\n", exit_code);
+    ckb_exit(exit_code);
 }
 
-void csi_free_on_fixed(void* ptr) {
-    if (g_csi_malloc_context.freed) {
-        PANIC(CSI_ERROR_DOUBLE_FREE);
-    }
-    if (g_csi_malloc_context.buf != ptr) {
-        PANIC(CSI_ERROR_FREE_WRONG_PTR);
-    }
-    g_csi_malloc_context.freed = true;
-}
-
-int csi_read_pipe(void* ctx, void* buf, size_t len, size_t* read_len) {
+static int csi_read_pipe(void* ctx, void* buf, size_t len, size_t* read_len) {
     *read_len = len;
     return ckb_read((uint64_t)ctx, buf, read_len);
 }
 
-int csi_write_pipe(void* ctx, const void* buf, size_t len, size_t* written_len) {
+static int csi_write_pipe(void* ctx, const void* buf, size_t len, size_t* written_len) {
     *written_len = len;
     return ckb_write((uint64_t)ctx, buf, written_len);
 }
@@ -191,6 +220,9 @@ int csi_receive_request(CSIChannel* channel, CSIRequestPacket* request) {
     CHECK(err);
 
     request->payload = g_csi_context.malloc(request->payload_len);
+    if (request->payload == NULL) {
+        PANIC(CSI_ERROR_MALLOC);
+    }
     size_t read_len = 0;
     err = channel->reader.read(channel->reader.ctx, request->payload, request->payload_len, &read_len);
     CHECK(err);
@@ -209,6 +241,9 @@ int csi_receive_response(CSIChannel* channel, CSIResponsePacket* response) {
     CHECK(err);
 
     response->payload = g_csi_context.malloc(response->payload_len);
+    if (response->payload == NULL) {
+        PANIC(CSI_ERROR_MALLOC);
+    }
     size_t read_len = 0;
     err = channel->reader.read(channel->reader.ctx, response->payload, response->payload_len, &read_len);
     CHECK(err);
@@ -294,4 +329,105 @@ int csi_vlq_decode(const void* buf, size_t len, uint64_t* value, size_t* out_len
     }
 
     return CSI_ERROR_VQL;
+}
+
+int csi_call(CSIChannel* channel, const CSIRequestPacket* request, CSIResponsePacket* response) {
+    int err = 0;
+    err = csi_send_request(channel, request);
+    CHECK(err);
+    err = csi_receive_response(channel, response);
+    CHECK(err);
+exit:
+    return err;
+}
+
+void csi_client_free_response_payload(CSIResponsePacket* response) {
+    if (response->payload_len == 0 || response->payload == NULL) {
+        PANIC(CSI_ERROR_FREE_WRONG_PTR);
+    }
+    g_csi_context.free(response->payload);
+}
+
+void csi_server_malloc_response_payload(CSIResponsePacket* response) {
+    if (response->payload_len == 0) {
+        PANIC(CSI_ERROR_MALLOC);
+    }
+    response->payload = g_csi_context.malloc(response->payload_len);
+    if (response->payload == NULL) {
+        PANIC(CSI_ERROR_MALLOC);
+    }
+}
+
+int csi_spawn_server(uint64_t index, uint64_t source, size_t offset, size_t length, const char* argv[], int argc,
+                     CSIChannel* client_channel) {
+    int err = 0;
+    uint64_t fds[2];
+    uint64_t fds2[2];
+    err = ckb_pipe(fds);
+    CHECK(err);
+    err = ckb_pipe(fds2);
+    CHECK(err);
+
+    uint64_t pid = 0;
+    uint64_t inherited_fds[3] = {fds2[0], fds[1], 0};
+    spawn_args_t spawn_args = {
+        .argc = argc,
+        .argv = argv,
+        .inherited_fds = inherited_fds,
+        .process_id = &pid,
+    };
+    size_t bounds = ((size_t)offset << 32) | length;
+    err = ckb_spawn(index, source, 0, bounds, &spawn_args);
+    CHECK(err);
+
+    // init client side channel
+    err = new_pipe_reader(fds[0], &client_channel->reader);
+    CHECK(err);
+    err = new_pipe_writer(fds2[1], &client_channel->writer);
+    CHECK(err);
+
+exit:
+    return err;
+}
+
+int csi_spawn_cell_server(void* code_hash, uint64_t hash_type, const char* argv[], int argc,
+                          CSIChannel* client_channel) {
+    int err = 0;
+    size_t index = SIZE_MAX;
+    err = ckb_look_for_dep_with_hash2(code_hash, hash_type, &index);
+    CHECK(err);
+    err = csi_spawn_server(index, CKB_SOURCE_CELL_DEP, 0, 0, argv, argc, client_channel);
+    CHECK(err);
+
+exit:
+    return err;
+}
+
+int csi_run_server(CSIServe serve) {
+    int err = 0;
+    uint64_t inherited_fds[2];
+    size_t len = 2;
+    err = ckb_inherited_fds(inherited_fds, &len);
+    CHECK(err);
+    CHECK2(len == 2, CSI_ERROR_INHERITED_FDS);
+
+    CSIChannel server_channel;
+    err = new_pipe_reader(inherited_fds[0], &server_channel.reader);
+    CHECK(err);
+    err = new_pipe_writer(inherited_fds[1], &server_channel.writer);
+    CHECK(err);
+
+    while (true) {
+        CSIRequestPacket request;
+        CSIResponsePacket response;
+        err = csi_receive_request(&server_channel, &request);
+        CHECK(err);
+        serve(&request, &response);
+        g_csi_context.free(request.payload);
+        err = csi_send_response(&server_channel, &response);
+        CHECK(err);
+        csi_client_free_response_payload(&response);
+    }
+exit:
+    return err;
 }
