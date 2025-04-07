@@ -8,9 +8,9 @@ uint8_t g_malloc_buf[1024];
 static int serve_call_back(const CSIRequestPacket* request, CSIResponsePacket* response) {
     printf("serve callback");
     int err = 0;
-    // fill out request, only accept specific request
+    // Only accept requests with method_id == 1
     if (request->method_id != 1) {
-        printf("method id is not 1, ignored");
+        printf("Ignoring request with method_id %d (expected: 1)\n", request->method_id);
         return 0;
     }
 

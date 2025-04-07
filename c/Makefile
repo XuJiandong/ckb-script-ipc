@@ -19,7 +19,7 @@ LDFLAGS := -Wl,-static -Wl,--gc-sections -nostdlib
 all: out lib examples
 
 
-lib: build/libckb_script_ipc.a
+lib: out build/libckb_script_ipc.a
 
 
 build/ckb_script_ipc.o: ckb_script_ipc.c ckb_script_ipc.h
