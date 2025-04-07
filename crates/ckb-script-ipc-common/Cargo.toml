@@ -1,6 +1,6 @@
 [package]
 name = "ckb-script-ipc-common"
-version = "1.0.1"
+version = "1.0.2"
 edition = "2021"
 authors = ["Lyndon <lynndon@gmail.com>"]
 license = "MIT"
@@ -18,7 +18,7 @@ serde_json = { version = "1.0.133", default-features = false, features = ["alloc
 log = { version = "0.4", optional = true, default-features = false }
 enumn = "0.1.14"
 ckb-rust-std = { version = "1.0.0", features = ["rust_before_181"]}
-ckb-vm = { version = "0.24.12", optional = true }
+ckb-vm = { version = "0.24.13", optional = true }
 
 [features]
 default = []
