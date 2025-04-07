@@ -377,7 +377,8 @@ fn ckb_vm_entry(
         .syscall(Box::new(DebugSyscall {}))
         .build();
     let mut machine = ckb_vm::machine::asm::AsmMachine::new(core);
-    machine.load_program(&code, &args)?;
+    let args_iter = args.into_iter().map(Ok);
+    machine.load_program(&code, args_iter)?;
     let _exit = machine.run();
     let _cycles = machine.machine.cycles();
     Ok(())
@@ -405,7 +406,8 @@ fn ckb_vm_entry(
         .syscall(Box::new(InheritedFdSyscall {}))
         .syscall(Box::new(CloseSyscall {}))
         .build();
-    machine.load_program(&code, &args)?;
+    let args_iter = args.into_iter().map(Ok);
+    machine.load_program(&code, args_iter)?;
     let _exit = machine.run();
     let _cycles = machine.cycles();
     Ok(())

@@ -1,8 +1,9 @@
-#include "ckb-script-ipc.h"
+#include <stdio.h>
 #include "ckb_syscall_apis.h"
 #include "ckb_consts.h"
+#include "ckb_script_ipc.h"
 
-#define MAX_VQL_LEN 10
+#define MAX_VLQ_LEN 10
 
 #define CHECK2(cond, code)                                                                                     \
     do {                                                                                                       \
@@ -54,7 +55,8 @@ CSIMallocFixedContext g_csi_malloc_context = {0};
 #define PANIC(e) g_csi_context.panic(e)
 int csi_vlq_encode(void* buf, size_t len, uint64_t value, size_t* out_len);
 int csi_vlq_decode(const void* buf, size_t len, uint64_t* value, size_t* out_len);
-int csi_read_next_vlq(CSIReader* reader, uint64_t* value);
+int csi_read_vlq(CSIReader* reader, uint64_t* value);
+int csi_write_vlq(CSIWriter* writer, uint64_t value);
 
 void* csi_malloc_on_fixed(size_t len) {
     for (size_t index = 0; index < 2; index++) {
@@ -70,6 +72,7 @@ void* csi_malloc_on_fixed(size_t len) {
 }
 
 void csi_free_on_fixed(void* ptr) {
+    if (ptr == NULL) return;
     for (size_t index = 0; index < 2; index++) {
         if ((g_csi_malloc_context.buf + g_csi_malloc_context.len / 2 * index) == ptr) {
             if (!g_csi_malloc_context.allocated[index]) {
@@ -102,10 +105,7 @@ void csi_init_malloc(CSIMalloc malloc, CSIFree free) {
 
 void csi_init_panic(CSIPanic panic) { g_csi_context.panic = panic; }
 
-void csi_default_panic(int exit_code) {
-    printf("ckb-script-ipc panic exit_code = %d\n", exit_code);
-    ckb_exit(exit_code);
-}
+void csi_default_panic(int exit_code) { ckb_exit(exit_code); }
 
 static int csi_read_pipe(void* ctx, void* buf, size_t len, size_t* read_len) {
     *read_len = len;
@@ -117,7 +117,7 @@ static int csi_write_pipe(void* ctx, const void* buf, size_t len, size_t* writte
     return ckb_write((uint64_t)ctx, buf, written_len);
 }
 
-int new_pipe_reader(uint64_t fd, CSIReader* reader) {
+static int new_pipe_reader(uint64_t fd, CSIReader* reader) {
     if (fd % 2 != 0) {
         return CSI_ERROR_INVALID_FD;
     }
@@ -126,7 +126,7 @@ int new_pipe_reader(uint64_t fd, CSIReader* reader) {
     return 0;
 }
 
-int new_pipe_writer(uint64_t fd, CSIWriter* writer) {
+static int new_pipe_writer(uint64_t fd, CSIWriter* writer) {
     if (fd % 2 != 1) {
         return CSI_ERROR_INVALID_FD;
     }
@@ -135,76 +135,56 @@ int new_pipe_writer(uint64_t fd, CSIWriter* writer) {
     return 0;
 }
 
+int csi_read_exact(CSIReader* reader, void* buf, size_t len) {
+    int remaining_len = len;
+    while (remaining_len > 0) {
+        size_t read_len = 0;
+        int err = reader->read(reader->ctx, buf, remaining_len, &read_len);
+        if (err) {
+            return err;
+        }
+        remaining_len -= read_len;
+        buf += read_len;
+    }
+    return 0;
+}
+
 int csi_send_request(CSIChannel* channel, const CSIRequestPacket* request) {
     int err = 0;
-    uint8_t buf[MAX_VQL_LEN];
-    size_t len = MAX_VQL_LEN;
-    size_t written_len = 0;
 
-    err = csi_vlq_encode(buf, len, request->version, &len);
+    err = csi_write_vlq(&channel->writer, request->version);
     CHECK(err);
-    err = channel->writer.write(channel->writer.ctx, buf, len, &written_len);
-    CHECK(err);
-    CHECK2(written_len == len, CSI_ERROR_SEND_REQUEST);
 
-    len = 16;
-    err = csi_vlq_encode(buf, len, request->method_id, &len);
+    err = csi_write_vlq(&channel->writer, request->method_id);
     CHECK(err);
-    written_len = 0;
-    err = channel->writer.write(channel->writer.ctx, buf, len, &written_len);
+    err = csi_write_vlq(&channel->writer, request->payload_len);
     CHECK(err);
-    CHECK2(written_len == len, CSI_ERROR_SEND_REQUEST);
 
-    len = 16;
-    err = csi_vlq_encode(buf, len, request->payload_len, &len);
-    CHECK(err);
-    written_len = 0;
-    err = channel->writer.write(channel->writer.ctx, buf, len, &written_len);
-    CHECK(err);
-    CHECK2(written_len == len, CSI_ERROR_SEND_REQUEST);
-
-    len = request->payload_len;
-    written_len = 0;
-    err = channel->writer.write(channel->writer.ctx, request->payload, len, &written_len);
-    CHECK(err);
-    CHECK2(written_len == len, CSI_ERROR_SEND_REQUEST);
+    if (request->payload_len > 0) {
+        size_t written_len = 0;
+        err = channel->writer.write(channel->writer.ctx, request->payload, request->payload_len, &written_len);
+        CHECK(err);
+        CHECK2(written_len == request->payload_len, CSI_ERROR_SEND_REQUEST);
+    }
 exit:
     return err;
 }
 
 int csi_send_response(CSIChannel* channel, const CSIResponsePacket* response) {
     int err = 0;
-    uint8_t buf[MAX_VQL_LEN];
-    size_t len = MAX_VQL_LEN;
-    size_t written_len = 0;
+    err = csi_write_vlq(&channel->writer, response->version);
+    CHECK(err);
+    err = csi_write_vlq(&channel->writer, response->error_code);
+    CHECK(err);
+    err = csi_write_vlq(&channel->writer, response->payload_len);
+    CHECK(err);
 
-    err = csi_vlq_encode(buf, len, response->version, &len);
-    CHECK(err);
-    err = channel->writer.write(channel->writer.ctx, buf, len, &written_len);
-    CHECK(err);
-    CHECK2(written_len == len, CSI_ERROR_SEND_RESPONSE);
-
-    len = sizeof(buf);
-    written_len = 0;
-    err = csi_vlq_encode(buf, len, response->error_code, &len);
-    CHECK(err);
-    err = channel->writer.write(channel->writer.ctx, buf, len, &written_len);
-    CHECK(err);
-    CHECK2(written_len == len, CSI_ERROR_SEND_RESPONSE);
-
-    len = sizeof(buf);
-    written_len = 0;
-    err = csi_vlq_encode(buf, len, response->payload_len, &len);
-    CHECK(err);
-    err = channel->writer.write(channel->writer.ctx, buf, len, &written_len);
-    CHECK(err);
-    CHECK2(written_len == len, CSI_ERROR_SEND_RESPONSE);
-
-    len = response->payload_len;
-    written_len = 0;
-    err = channel->writer.write(channel->writer.ctx, response->payload, len, &written_len);
-    CHECK(err);
-    CHECK2(written_len == len, CSI_ERROR_SEND_RESPONSE);
+    if (response->payload_len > 0) {
+        size_t written_len = 0;
+        err = channel->writer.write(channel->writer.ctx, response->payload, response->payload_len, &written_len);
+        CHECK(err);
+        CHECK2(written_len == response->payload_len, CSI_ERROR_SEND_RESPONSE);
+    }
 
 exit:
     return err;
@@ -212,52 +192,64 @@ exit:
 
 int csi_receive_request(CSIChannel* channel, CSIRequestPacket* request) {
     int err = 0;
-    err = csi_read_next_vlq(&channel->reader, &request->version);
+    err = csi_read_vlq(&channel->reader, &request->version);
     CHECK(err);
-    err = csi_read_next_vlq(&channel->reader, &request->method_id);
+    err = csi_read_vlq(&channel->reader, &request->method_id);
     CHECK(err);
-    err = csi_read_next_vlq(&channel->reader, &request->payload_len);
+    err = csi_read_vlq(&channel->reader, &request->payload_len);
     CHECK(err);
 
-    request->payload = g_csi_context.malloc(request->payload_len);
-    if (request->payload == NULL) {
-        PANIC(CSI_ERROR_MALLOC);
+    if (request->payload_len > 0) {
+        request->payload = g_csi_context.malloc(request->payload_len);
+        if (request->payload == NULL) {
+            PANIC(CSI_ERROR_MALLOC);
+        }
+        err = csi_read_exact(&channel->reader, request->payload, request->payload_len);
+        CHECK(err);
     }
-    size_t read_len = 0;
-    err = channel->reader.read(channel->reader.ctx, request->payload, request->payload_len, &read_len);
-    CHECK(err);
-    CHECK2(read_len == request->payload_len, CSI_ERROR_RECEIVE_REQUEST);
 exit:
     return err;
 }
 
 int csi_receive_response(CSIChannel* channel, CSIResponsePacket* response) {
     int err = 0;
-    err = csi_read_next_vlq(&channel->reader, &response->version);
+    err = csi_read_vlq(&channel->reader, &response->version);
     CHECK(err);
-    err = csi_read_next_vlq(&channel->reader, &response->error_code);
+    err = csi_read_vlq(&channel->reader, &response->error_code);
     CHECK(err);
-    err = csi_read_next_vlq(&channel->reader, &response->payload_len);
+    err = csi_read_vlq(&channel->reader, &response->payload_len);
     CHECK(err);
 
-    response->payload = g_csi_context.malloc(response->payload_len);
-    if (response->payload == NULL) {
-        PANIC(CSI_ERROR_MALLOC);
+    if (response->payload_len > 0) {
+        response->payload = g_csi_context.malloc(response->payload_len);
+        if (response->payload == NULL) {
+            PANIC(CSI_ERROR_MALLOC);
+        }
+        err = csi_read_exact(&channel->reader, response->payload, response->payload_len);
+        CHECK(err);
     }
-    size_t read_len = 0;
-    err = channel->reader.read(channel->reader.ctx, response->payload, response->payload_len, &read_len);
-    CHECK(err);
-    CHECK2(read_len == response->payload_len, CSI_ERROR_RECEIVE_RESPONSE);
 exit:
     return err;
 }
 
-int csi_send_error_code(CSIChannel* channel, int error_code) { return -1; }
+int csi_write_vlq(CSIWriter* writer, uint64_t value) {
+    int err = 0;
+    uint8_t buf[MAX_VLQ_LEN];
+    size_t len = MAX_VLQ_LEN;
+    size_t written_len = 0;
+    err = csi_vlq_encode(buf, len, value, &len);
+    CHECK(err);
+    err = writer->write(writer->ctx, buf, len, &written_len);
+    CHECK(err);
+    CHECK2(written_len == len, CSI_ERROR_SEND_VLQ);
+exit:
+    return err;
+}
 
-int csi_read_next_vlq(CSIReader* reader, uint64_t* value) {
+int csi_read_vlq(CSIReader* reader, uint64_t* value) {
     int err = 0;
     uint8_t peek;
-    uint8_t buf[MAX_VQL_LEN];
+    uint8_t buf[MAX_VLQ_LEN];
     size_t buf_len = 0;
 
     while (1) {
@@ -289,7 +281,7 @@ int csi_vlq_encode(void* buf, size_t len, uint64_t value, size_t* out_len) {
 
     do {
         if (written >= len) {
-            return CSI_ERROR_VQL;
+            return CSI_ERROR_VLQ;
         }
 
         uint8_t byte = value & 0x7F;
@@ -324,11 +316,11 @@ int csi_vlq_decode(const void* buf, size_t len, uint64_t* value, size_t* out_len
 
         shift += 7;
         if (shift >= 64) {
-            return CSI_ERROR_VQL;
+            return CSI_ERROR_VLQ;
         }
     }
 
-    return CSI_ERROR_VQL;
+    return CSI_ERROR_VLQ;
 }
 
 int csi_call(CSIChannel* channel, const CSIRequestPacket* request, CSIResponsePacket* response) {
@@ -337,20 +329,22 @@ int csi_call(CSIChannel* channel, const CSIRequestPacket* request, CSIResponsePa
     CHECK(err);
     err = csi_receive_response(channel, response);
     CHECK(err);
+    err = response->error_code;
 exit:
     return err;
 }
 
 void csi_client_free_response_payload(CSIResponsePacket* response) {
-    if (response->payload_len == 0 || response->payload == NULL) {
-        PANIC(CSI_ERROR_FREE_WRONG_PTR);
+    if (response->payload == NULL) {
+        return;
     }
     g_csi_context.free(response->payload);
 }
 
 void csi_server_malloc_response_payload(CSIResponsePacket* response) {
     if (response->payload_len == 0) {
-        PANIC(CSI_ERROR_MALLOC);
+        response->payload = NULL;
+        return;
     }
     response->payload = g_csi_context.malloc(response->payload_len);
     if (response->payload == NULL) {
@@ -422,7 +416,8 @@ int csi_run_server(CSIServe serve) {
         CSIResponsePacket response;
         err = csi_receive_request(&server_channel, &request);
         CHECK(err);
-        serve(&request, &response);
+        err = serve(&request, &response);
+        CHECK(err);
         g_csi_context.free(request.payload);
         err = csi_send_response(&server_channel, &response);
         CHECK(err);

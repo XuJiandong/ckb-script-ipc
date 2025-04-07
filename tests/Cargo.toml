@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ckb-testtool = "0.14"
+ckb-testtool = "0.15.1"
 serde_json = "1.0"
 blake2b-ref = "0.3.1"
 sha2 = "0.10.8"

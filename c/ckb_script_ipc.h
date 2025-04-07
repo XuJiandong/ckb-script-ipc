@@ -3,7 +3,7 @@
 #ifndef __CKB_SCRIPT_IPC_H__
 #define __CKB_SCRIPT_IPC_H__
 #include <stdint.h>
-
+#include <stdbool.h>
 /**
  * Error Code.
  * The functions in this library return this error code to indicate success or failure.
@@ -11,7 +11,7 @@
 typedef enum CSIErrorCode {
     CSI_SUCCESS = 0,
     CSI_ERROR_INVALID_REQUEST = 50,
-    CSI_ERROR_VQL,
+    CSI_ERROR_VLQ,
     CSI_ERROR_MALLOC,
     CSI_ERROR_MALLOC_TOO_LARGE,
     CSI_ERROR_DOUBLE_FREE,
@@ -22,6 +22,7 @@ typedef enum CSIErrorCode {
     CSI_ERROR_RECEIVE_RESPONSE,
     CSI_ERROR_SEND_REQUEST,
     CSI_ERROR_SEND_RESPONSE,
+    CSI_ERROR_SEND_VLQ,
     CSI_ERROR_INHERITED_FDS,
     CSI_ERROR_FIXED_MEMORY_NOT_ALIGNED,
 } CSIErrorCode;
@@ -175,6 +176,8 @@ typedef int (*CSIServe)(const CSIRequestPacket* request, CSIResponsePacket* resp
  *
  * This function must be called within the `CSIServe` callback function to allocate
  * memory for the response payload before populating it with data.
+ *
+ * If payload_len is 0, the payload will be set to NULL after allocation.
  *
  * @param response: Pointer to the response packet whose payload will be allocated, according to the payload_len.
  *
