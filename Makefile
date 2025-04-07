@@ -120,12 +120,8 @@ generate:
 		mv Cargo.toml.new Cargo.toml; \
 	fi
 
-debugger:
-	ckb-debugger --bin build/release/ckb-script-ipc-demo
-
 prepare:
 	rustup target add riscv64imac-unknown-none-elf
-	cargo install --git https://github.com/nervosnetwork/ckb-standalone-debugger ckb-debugger
 
 # Generate checksum info for reproducible build
 CHECKSUM_FILE := build/checksums-$(MODE).txt
