@@ -206,3 +206,6 @@ Communication (IPC) rather than Remote Procedure Call (RPC). RPC encompasses
 additional features such as encryption, authentication, error propagation,
 retries and timeouts, scaling, and more. This crate focuses on a limited subset of
 these features, primarily those relevant to IPC.
+
+Q: Is there a C implementation available?
+A: Yes, there is a C implementation available. See [C implementation](./c/README.md) for details. The C implementation provides the core IPC functionality but does not include built-in serialization/deserialization support. Developers using the C implementation will need to handle data serialization manually, typically using a custom format.

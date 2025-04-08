@@ -14,7 +14,7 @@ or integrate [ckb_script_ipc.c](./ckb_script_ipc.c) and [ckb_script_ipc.h](./ckb
 // 1. Initialize memory allocation
 // You can choose between fixed memory or custom allocator:
 // Option A: Fixed memory buffer
-uint8_t g_malloc_buf[BUFFER_SIZE] __attribute__((aligned(8)));
+uint8_t g_malloc_buf[BUFFER_SIZE];
 csi_init_fixed_memory(g_malloc_buf, sizeof(g_malloc_buf));
 
 // Option B: Custom allocator
@@ -141,3 +141,17 @@ static int serve_callback(const CSIRequestPacket* request, CSIResponsePacket* re
 }
 ```
 The fixed allocator is designed for simple IPC scenarios - if you need more complex memory management, consider implementing a custom allocator.
+
+## IO Buffer
+By default, the library performs unbuffered I/O operations, which can result in frequent system calls to `read` and `write`. In high-throughput scenarios, these frequent system calls can impact performance.
+
+To optimize I/O performance, you can enable buffering by providing a pre-allocated buffer:
+```c
+uint8_t g_io_buf[1024];
+
+// ...
+csi_init_io_buffer(g_io_buf, sizeof(g_io_buf));
+```
+
+The buffer must be at least 1024 bytes in size.
+

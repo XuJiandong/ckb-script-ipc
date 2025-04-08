@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include "ckb_syscall_apis.h"
 #include "ckb_consts.h"
 #include "ckb_script_ipc.h"
@@ -29,6 +30,9 @@ typedef struct CSIContext {
     CSIMalloc malloc;
     CSIFree free;
     CSIPanic panic;
+    bool enable_io_buf;
+    void* io_buf;
+    size_t io_buf_len;
 } CSIContext;
 
 CSIContext g_csi_context = {0};
@@ -93,19 +97,36 @@ void csi_init_fixed_memory(void* buf, size_t len) {
     g_csi_malloc_context.len = len;
     g_csi_malloc_context.allocated[0] = false;
     g_csi_malloc_context.allocated[1] = false;
-
     g_csi_context.malloc = csi_malloc_on_fixed;
     g_csi_context.free = csi_free_on_fixed;
+    g_csi_context.enable_io_buf = false;
+    g_csi_context.io_buf = NULL;
+    g_csi_context.io_buf_len = 0;
 }
 
 void csi_init_malloc(CSIMalloc malloc, CSIFree free) {
     g_csi_context.malloc = malloc;
     g_csi_context.free = free;
+    g_csi_context.enable_io_buf = false;
+    g_csi_context.io_buf = NULL;
+    g_csi_context.io_buf_len = 0;
 }
 
 void csi_init_panic(CSIPanic panic) { g_csi_context.panic = panic; }
 
 void csi_default_panic(int exit_code) { ckb_exit(exit_code); }
+
+void csi_init_io_buffer(void* buf, size_t len) {
+    if (len < 1024) {
+        PANIC(CSI_ERROR_IO_BUFFER_TOO_SMALL);
+    }
+    if (len % 2 != 0) {
+        PANIC(CSI_ERROR_IO_BUFFER_NOT_ALIGNED);
+    }
+    g_csi_context.enable_io_buf = true;
+    g_csi_context.io_buf = buf;
+    g_csi_context.io_buf_len = len;
+}
 
 static int csi_read_pipe(void* ctx, void* buf, size_t len, size_t* read_len) {
     *read_len = len;
@@ -113,9 +134,15 @@ static int csi_read_pipe(void* ctx, void* buf, size_t len, size_t* read_len) {
 }
 
 static int csi_write_pipe(void* ctx, const void* buf, size_t len, size_t* written_len) {
+    if (len == 0) {
+        *written_len = 0;
+        return 0;
+    }
     *written_len = len;
     return ckb_write((uint64_t)ctx, buf, written_len);
 }
+
+static int csi_flush_pipe(void* ctx) { return 0; }
 
 static int new_pipe_reader(uint64_t fd, CSIReader* reader) {
     if (fd % 2 != 0) {
@@ -132,7 +159,116 @@ static int new_pipe_writer(uint64_t fd, CSIWriter* writer) {
     }
     writer->ctx = (void*)fd;
     writer->write = csi_write_pipe;
+    writer->flush = csi_flush_pipe;
     return 0;
+}
+
+// This is a variable length structure.
+typedef struct CSIBuffer {
+    // underlying reader/writer without buffer
+    union {
+        CSIReader reader;
+        CSIWriter writer;
+    } rw;
+    // The current seek offset into `buf`, must always be <= `filled_len`.
+    size_t pos;
+    // The number of bytes currently stored in `buf`.
+    size_t filled_len;
+    // The maximum number of bytes that can be stored in `buf`.
+    size_t max_len;
+    // The buffer data.
+    uint8_t buf[];
+} CSIBuffer;
+
+// the slot must be 0 or 1
+static void new_buffer(CSIBuffer** buf, size_t slot) {
+    if (slot > 1) {
+        PANIC(CSI_ERROR_INVALID_SLOT);
+    }
+    size_t slot_len = g_csi_context.io_buf_len / 2;
+    *buf = (CSIBuffer*)(((uint8_t*)g_csi_context.io_buf) + slot_len * slot);
+    (*buf)->pos = 0;
+    (*buf)->filled_len = 0;
+    (*buf)->max_len = slot_len - sizeof(CSIBuffer);
+}
+
+static int buf_read(void* ctx, void* buf, size_t len, size_t* read_len) {
+    int err = 0;
+    CSIBuffer* buffer = (CSIBuffer*)ctx;
+    // fill buffer
+    if (buffer->pos == buffer->filled_len) {
+        CSIReader reader = buffer->rw.reader;
+        err = reader.read(reader.ctx, buffer->buf, buffer->max_len, &buffer->filled_len);
+        CHECK(err);
+        buffer->pos = 0;
+    }
+    if (buffer->pos > buffer->filled_len || buffer->filled_len > buffer->max_len) {
+        PANIC(CSI_ERROR_INTERNAL);
+    }
+    size_t reaming_len = buffer->filled_len - buffer->pos;
+    *read_len = len > reaming_len ? reaming_len : len;
+    memcpy(buf, buffer->buf + buffer->pos, *read_len);
+    buffer->pos += *read_len;
+
+exit:
+    return err;
+}
+
+static int buf_flush(void* ctx) {
+    int err = 0;
+    CSIBuffer* buffer = (CSIBuffer*)ctx;
+    size_t written_len = 0;
+    const CSIWriter writer = buffer->rw.writer;
+    err = writer.write(writer.ctx, buffer->buf, buffer->filled_len, &written_len);
+    CHECK(err);
+    CHECK2(written_len == buffer->filled_len, CSI_ERROR_INTERNAL);
+    buffer->pos = 0;
+    buffer->filled_len = 0;
+
+exit:
+    return err;
+}
+
+static int buf_write(void* ctx, const void* buf, size_t len, size_t* written_len) {
+    int err = 0;
+    CSIBuffer* buffer = (CSIBuffer*)ctx;
+    if (buffer->filled_len + len > buffer->max_len) {
+        err = buf_flush(ctx);
+        CHECK(err);
+    }
+    // if the written buffer is too large, directly write it.
+    if (len > buffer->max_len) {
+        CSIWriter writer = buffer->rw.writer;
+        err = writer.write(writer.ctx, buf, len, written_len);
+        CHECK(err);
+        *written_len = len;
+        return 0;
+    } else {
+        memcpy(&buffer->buf[buffer->filled_len], buf, len);
+        buffer->filled_len += len;
+        *written_len = len;
+    }
+exit:
+    return err;
+}
+
+static void new_buf_reader(CSIReader reader, CSIReader* buf_reader) {
+    CSIBuffer* buf = NULL;
+    new_buffer(&buf, 0);  // 0 for reader
+    buf->rw.reader = reader;
+
+    buf_reader->ctx = buf;
+    buf_reader->read = buf_read;
+}
+
+static void new_buf_writer(const CSIWriter writer, CSIWriter* buf_writer) {
+    CSIBuffer* buf = NULL;
+    new_buffer(&buf, 1);  // 1 for writer
+    buf->rw.writer = writer;
+
+    buf_writer->ctx = buf;
+    buf_writer->write = buf_write;
+    buf_writer->flush = buf_flush;
 }
 
 int csi_read_exact(CSIReader* reader, void* buf, size_t len) {
@@ -166,6 +302,8 @@ int csi_send_request(CSIChannel* channel, const CSIRequestPacket* request) {
         CHECK(err);
         CHECK2(written_len == request->payload_len, CSI_ERROR_SEND_REQUEST);
     }
+    err = channel->writer.flush(channel->writer.ctx);
+    CHECK(err);
 exit:
     return err;
 }
@@ -185,6 +323,8 @@ int csi_send_response(CSIChannel* channel, const CSIResponsePacket* response) {
         CHECK(err);
         CHECK2(written_len == response->payload_len, CSI_ERROR_SEND_RESPONSE);
     }
+    err = channel->writer.flush(channel->writer.ctx);
+    CHECK(err);
 
 exit:
     return err;
@@ -375,11 +515,23 @@ int csi_spawn_server(uint64_t index, uint64_t source, size_t offset, size_t leng
     CHECK(err);
 
     // init client side channel
-    err = new_pipe_reader(fds[0], &client_channel->reader);
+    CSIReader reader = {0};
+    err = new_pipe_reader(fds[0], &reader);
     CHECK(err);
-    err = new_pipe_writer(fds2[1], &client_channel->writer);
-    CHECK(err);
+    if (g_csi_context.enable_io_buf) {
+        new_buf_reader(reader, &client_channel->reader);
+    } else {
+        client_channel->reader = reader;
+    }
 
+    CSIWriter writer = {0};
+    err = new_pipe_writer(fds2[1], &writer);
+    CHECK(err);
+    if (g_csi_context.enable_io_buf) {
+        new_buf_writer(writer, &client_channel->writer);
+    } else {
+        client_channel->writer = writer;
+    }
 exit:
     return err;
 }
@@ -405,11 +557,24 @@ int csi_run_server(CSIServe serve) {
     CHECK(err);
     CHECK2(len == 2, CSI_ERROR_INHERITED_FDS);
 
-    CSIChannel server_channel;
-    err = new_pipe_reader(inherited_fds[0], &server_channel.reader);
+    CSIChannel server_channel = {0};
+    CSIReader reader = {0};
+    err = new_pipe_reader(inherited_fds[0], &reader);
     CHECK(err);
-    err = new_pipe_writer(inherited_fds[1], &server_channel.writer);
+    if (g_csi_context.enable_io_buf) {
+        new_buf_reader(reader, &server_channel.reader);
+    } else {
+        server_channel.reader = reader;
+    }
+
+    CSIWriter writer = {0};
+    err = new_pipe_writer(inherited_fds[1], &writer);
     CHECK(err);
+    if (g_csi_context.enable_io_buf) {
+        new_buf_writer(writer, &server_channel.writer);
+    } else {
+        server_channel.writer = writer;
+    }
 
     while (true) {
         CSIRequestPacket request;

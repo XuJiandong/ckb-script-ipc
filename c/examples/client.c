@@ -5,10 +5,12 @@
 #include "ckb_script_ipc.h"
 
 uint8_t g_malloc_buf[1024];
+uint8_t g_io_buf[2048];
 
 int main() {
     printf("client started");
     csi_init_fixed_memory(g_malloc_buf, sizeof(g_malloc_buf));
+    csi_init_io_buffer(g_io_buf, sizeof(g_io_buf));
 
     int err = 0;
     CSIChannel channel;

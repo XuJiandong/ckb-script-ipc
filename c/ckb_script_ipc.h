@@ -10,7 +10,8 @@
  */
 typedef enum CSIErrorCode {
     CSI_SUCCESS = 0,
-    CSI_ERROR_INVALID_REQUEST = 50,
+    CSI_ERROR_INTERNAL = 50,
+    CSI_ERROR_INVALID_REQUEST,
     CSI_ERROR_VLQ,
     CSI_ERROR_MALLOC,
     CSI_ERROR_MALLOC_TOO_LARGE,
@@ -25,6 +26,9 @@ typedef enum CSIErrorCode {
     CSI_ERROR_SEND_VLQ,
     CSI_ERROR_INHERITED_FDS,
     CSI_ERROR_FIXED_MEMORY_NOT_ALIGNED,
+    CSI_ERROR_IO_BUFFER_TOO_SMALL,
+    CSI_ERROR_IO_BUFFER_NOT_ALIGNED,
+    CSI_ERROR_INVALID_SLOT
 } CSIErrorCode;
 
 typedef void* (*CSIMalloc)(size_t len);
@@ -54,6 +58,19 @@ void csi_init_fixed_memory(void* buf, size_t len);
  *       Only one memory allocation strategy can be active at a time.
  */
 void csi_init_malloc(CSIMalloc malloc, CSIFree free);
+
+/**
+ * Initialize an I/O buffer to optimize read and write operations.
+ * This is an optional optimization that can reduce the number of system calls
+ * when performing frequent I/O operations.
+ *
+ * @param buf Pointer to the pre-allocated memory buffer for I/O operations
+ * @param len Size of the pre-allocated buffer in bytes
+ *
+ * @note The buffer must be at least 1024 bytes in size.
+ * @note The buffer must be 2-byte aligned for optimal performance.
+ */
+void csi_init_io_buffer(void* buf, size_t len);
 
 /**
  * Initialize a custom panic handler function.
@@ -92,10 +109,12 @@ typedef struct CSIReader {
  * @return 0 for success, non-zero for failure
  */
 typedef int (*CSIWrite)(void* ctx, const void* buf, size_t len, size_t* written_len);
+typedef int (*CSIFlush)(void* ctx);
 
 typedef struct CSIWriter {
     void* ctx;
     CSIWrite write;
+    CSIFlush flush;
 } CSIWriter;
 
 typedef struct CSIRequestPacket {
