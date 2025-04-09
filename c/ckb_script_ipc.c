@@ -67,12 +67,13 @@ static void fixed_allocator_init(FixedAllocator* allocator, void* buf, size_t le
 }
 
 static void* fixed_allocator_malloc(FixedAllocator* allocator, size_t size) {
-    uint64_t available = allocator->used_flags;
-    size_t index = 0;
-    while ((available & 1) == 1) {
-        available >>= 1;
-        index++;
+    // find first zero bit(LSB)
+    uint64_t revert_flags = ~allocator->used_flags;
+    if (revert_flags == 0) {
+        return NULL;
     }
+    size_t index = __builtin_ctzll(revert_flags);
+
     if (index >= allocator->block_count) {
         return NULL;
     }
