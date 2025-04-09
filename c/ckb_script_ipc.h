@@ -26,9 +26,12 @@ typedef enum CSIErrorCode {
     CSI_ERROR_SEND_VLQ,
     CSI_ERROR_INHERITED_FDS,
     CSI_ERROR_FIXED_MEMORY_NOT_ALIGNED,
-    CSI_ERROR_IO_BUFFER_TOO_SMALL,
-    CSI_ERROR_IO_BUFFER_NOT_ALIGNED,
-    CSI_ERROR_INVALID_SLOT
+    CSI_ERROR_PAYLOAD_TOO_SMALL,
+    CSI_ERROR_IOBUF_TOO_SMALL,
+    CSI_ERROR_IOBUF_NOT_ALIGNED,
+    CSI_ERROR_INVALID_SLOT,
+    CSI_ERROR_FA_TOO_MANY_BLOCK,
+    CSI_ERROR_FA_NOT_ALIGNED,
 } CSIErrorCode;
 
 typedef void* (*CSIMalloc)(size_t len);
@@ -41,23 +44,11 @@ typedef void (*CSIPanic)(int exit_code);
  *
  * @param buf Pointer to the pre-allocated memory buffer
  * @param len Size of the pre-allocated buffer in bytes
- *
+ * @param block_count Number of memory blocks that can be allocated simultaneously
  * @note This function is mutually exclusive with csi_init_malloc().
  *       Only one memory allocation strategy can be active at a time.
  */
-void csi_init_fixed_memory(void* buf, size_t len);
-
-/**
- * Initialize a custom memory allocator.
- * This allows using external memory management functions.
- *
- * @param malloc Function pointer to custom memory allocation function
- * @param free Function pointer to custom memory deallocation function
- *
- * @note This function is mutually exclusive with csi_init_fixed_memory().
- *       Only one memory allocation strategy can be active at a time.
- */
-void csi_init_malloc(CSIMalloc malloc, CSIFree free);
+void csi_init_payload(void* buf, size_t len, size_t block_count);
 
 /**
  * Initialize an I/O buffer to optimize read and write operations.
@@ -66,11 +57,23 @@ void csi_init_malloc(CSIMalloc malloc, CSIFree free);
  *
  * @param buf Pointer to the pre-allocated memory buffer for I/O operations
  * @param len Size of the pre-allocated buffer in bytes
- *
+ * @param block_count Number of memory blocks that can be allocated simultaneously
  * @note The buffer must be at least 1024 bytes in size.
- * @note The buffer must be 2-byte aligned for optimal performance.
+ * @note The buffer must be 2-byte aligned
  */
-void csi_init_io_buffer(void* buf, size_t len);
+void csi_init_iobuf(void* buf, size_t len, size_t block_count);
+
+/**
+ * Initialize a custom memory allocator.
+ * This allows using external memory management functions.
+ *
+ * @param malloc Function pointer to custom memory allocation function
+ * @param free Function pointer to custom memory deallocation function
+ *
+ * @note This function is mutually exclusive with csi_init_payload() and csi_init_iobuf().
+ *       Only one memory allocation strategy can be active at a time.
+ */
+void csi_init_malloc(CSIMalloc malloc, CSIFree free);
 
 /**
  * Initialize a custom panic handler function.
@@ -171,6 +174,20 @@ int csi_spawn_server(uint64_t index, uint64_t source, size_t offset, size_t leng
                      CSIChannel* client_channel);
 int csi_spawn_cell_server(void* code_hash, uint64_t hash_type, const char* argv[], int argc,
                           CSIChannel* client_channel);
+
+/**
+ * Frees the resources associated with a CSIChannel.
+ *
+ * This function releases the internal buffers and resources used by the channel.
+ *
+ * @param ch: Pointer to the channel to be freed. Must not be NULL.
+ *
+ * @note This function is optional and typically not needed since channels
+ *       are usually maintained for the lifetime of the application.
+ *       However, it can be useful in scenarios where channels are created
+ *       and destroyed dynamically.
+ */
+void csi_free_channel(CSIChannel* ch);
 
 /**
  * Callback function type for handling IPC requests in the server.

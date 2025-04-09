@@ -25,107 +25,117 @@
         }                                                                                                      \
     } while (0)
 
-typedef struct CSIContext {
-    void* malloc_ctx;
-    CSIMalloc malloc;
-    CSIFree free;
-    CSIPanic panic;
-    bool enable_io_buf;
-    void* io_buf;
-    size_t io_buf_len;
-} CSIContext;
-
-CSIContext g_csi_context = {0};
-
-/**
- * Context for a fixed-size memory allocator that manages two equal-sized memory blocks.
- *
- * This allocator divides the provided buffer into two equal parts, allowing for
- * allocation and deallocation of these two fixed-size blocks. Each block can be
- * independently allocated and freed.
- *
- * @field buf   Pointer to the start of the memory buffer
- * @field len   Total size of the memory buffer in bytes
- * @field allocated Array tracking the allocation state of each block (true = allocated, false = free)
- */
-typedef struct CSIMallocFixedContext {
-    void* buf;          // Base pointer to the memory buffer
-    size_t len;         // Total buffer size in bytes
-    bool allocated[2];  // Allocation state for each block (true = allocated, false = free)
-} CSIMallocFixedContext;
-
-CSIMallocFixedContext g_csi_malloc_context = {0};
-
 #define PANIC(e) g_csi_context.panic(e)
 int csi_vlq_encode(void* buf, size_t len, uint64_t value, size_t* out_len);
 int csi_vlq_decode(const void* buf, size_t len, uint64_t* value, size_t* out_len);
 int csi_read_vlq(CSIReader* reader, uint64_t* value);
 int csi_write_vlq(CSIWriter* writer, uint64_t value);
 
-void* csi_malloc_on_fixed(size_t len) {
-    for (size_t index = 0; index < 2; index++) {
-        if ((g_csi_malloc_context.len / 2) < len) {
-            PANIC(CSI_ERROR_MALLOC_TOO_LARGE);
-        }
-        if (!g_csi_malloc_context.allocated[index]) {
-            g_csi_malloc_context.allocated[index] = true;
-            return g_csi_malloc_context.buf + g_csi_malloc_context.len / 2 * index;
-        }
+typedef struct CSIContext {
+    void* malloc_ctx;
+    CSIMalloc payload_malloc;
+    CSIFree payload_free;
+    CSIMalloc iobuf_malloc;
+    CSIFree iobuf_free;
+    CSIPanic panic;
+} CSIContext;
+
+static CSIContext g_csi_context = {0};
+
+typedef struct FixedAllocator {
+    // support up to 64 blocks
+    uint64_t used_flags;
+    size_t block_count;
+    size_t len;
+    void* buf;
+} FixedAllocator;
+
+static FixedAllocator g_payload_allocator = {0};
+static FixedAllocator g_iobuf_allocator = {0};
+
+static void fixed_allocator_init(FixedAllocator* allocator, void* buf, size_t len, size_t block_count) {
+    if (block_count > sizeof(allocator->used_flags) * 8) {
+        PANIC(CSI_ERROR_FA_TOO_MANY_BLOCK);
     }
-    return NULL;
+    if (len % block_count != 0) {
+        PANIC(CSI_ERROR_FA_NOT_ALIGNED);
+    }
+    allocator->used_flags = 0;
+    allocator->block_count = block_count;
+    allocator->len = len;
+    allocator->buf = buf;
 }
 
-void csi_free_on_fixed(void* ptr) {
-    if (ptr == NULL) return;
-    for (size_t index = 0; index < 2; index++) {
-        if ((g_csi_malloc_context.buf + g_csi_malloc_context.len / 2 * index) == ptr) {
-            if (!g_csi_malloc_context.allocated[index]) {
-                PANIC(CSI_ERROR_DOUBLE_FREE);
-            }
-            g_csi_malloc_context.allocated[index] = false;
-            return;
-        }
+static void* fixed_allocator_malloc(FixedAllocator* allocator, size_t size) {
+    uint64_t available = allocator->used_flags;
+    size_t index = 0;
+    while ((available & 1) == 1) {
+        available >>= 1;
+        index++;
     }
-    PANIC(CSI_ERROR_FREE_WRONG_PTR);
+    if (index >= allocator->block_count) {
+        return NULL;
+    }
+    allocator->used_flags |= (1 << index);
+    size_t block_size = allocator->len / allocator->block_count;
+    if (size > block_size) {
+        return NULL;
+    }
+    return allocator->buf + block_size * index;
 }
 
-void csi_init_fixed_memory(void* buf, size_t len) {
-    if (len % 2 != 0) {
-        PANIC(CSI_ERROR_FIXED_MEMORY_NOT_ALIGNED);
+static void fixed_allocator_free(FixedAllocator* allocator, void* ptr) {
+    if (ptr == NULL) {
+        return;
     }
-    g_csi_malloc_context.buf = buf;
-    g_csi_malloc_context.len = len;
-    g_csi_malloc_context.allocated[0] = false;
-    g_csi_malloc_context.allocated[1] = false;
-    g_csi_context.malloc = csi_malloc_on_fixed;
-    g_csi_context.free = csi_free_on_fixed;
-    g_csi_context.enable_io_buf = false;
-    g_csi_context.io_buf = NULL;
-    g_csi_context.io_buf_len = 0;
+    if (ptr < allocator->buf || ptr >= (allocator->buf + allocator->len)) {
+        PANIC(CSI_ERROR_INTERNAL);
+    }
+    size_t block_size = allocator->len / allocator->block_count;
+    size_t offset = ptr - allocator->buf;
+    if ((offset % block_size) != 0) {
+        PANIC(CSI_ERROR_INTERNAL);
+    }
+    size_t index = offset / block_size;
+    allocator->used_flags &= ~(1 << index);
+}
+
+static void* payload_malloc(size_t len) { return fixed_allocator_malloc(&g_payload_allocator, len); }
+
+static void payload_free(void* ptr) { return fixed_allocator_free(&g_payload_allocator, ptr); }
+
+void csi_init_payload(void* buf, size_t len, size_t block_count) {
+    if (len < 1024) {
+        PANIC(CSI_ERROR_PAYLOAD_TOO_SMALL);
+    }
+    fixed_allocator_init(&g_payload_allocator, buf, len, block_count);
+
+    g_csi_context.payload_malloc = payload_malloc;
+    g_csi_context.payload_free = payload_free;
 }
 
 void csi_init_malloc(CSIMalloc malloc, CSIFree free) {
-    g_csi_context.malloc = malloc;
-    g_csi_context.free = free;
-    g_csi_context.enable_io_buf = false;
-    g_csi_context.io_buf = NULL;
-    g_csi_context.io_buf_len = 0;
+    g_csi_context.payload_malloc = malloc;
+    g_csi_context.payload_free = free;
+    g_csi_context.iobuf_malloc = malloc;
+    g_csi_context.iobuf_free = free;
 }
 
 void csi_init_panic(CSIPanic panic) { g_csi_context.panic = panic; }
 
 void csi_default_panic(int exit_code) { ckb_exit(exit_code); }
 
-void csi_init_io_buffer(void* buf, size_t len) {
+static void* iobuf_malloc(size_t len) { return fixed_allocator_malloc(&g_iobuf_allocator, len); }
+
+static void iobuf_free(void* ptr) { return fixed_allocator_free(&g_iobuf_allocator, ptr); }
+
+void csi_init_iobuf(void* buf, size_t len, size_t block_count) {
     if (len < 1024) {
-        PANIC(CSI_ERROR_IO_BUFFER_TOO_SMALL);
+        PANIC(CSI_ERROR_IOBUF_TOO_SMALL);
     }
-    if (len % 2 != 0) {
-        PANIC(CSI_ERROR_IO_BUFFER_NOT_ALIGNED);
-    }
-    g_csi_context.enable_io_buf = true;
-    g_csi_context.io_buf = buf;
-    g_csi_context.io_buf_len = len;
+    fixed_allocator_init(&g_iobuf_allocator, buf, len, block_count);
+    g_csi_context.iobuf_malloc = iobuf_malloc;
+    g_csi_context.iobuf_free = iobuf_free;
 }
 
 static int csi_read_pipe(void* ctx, void* buf, size_t len, size_t* read_len) {
@@ -180,16 +190,12 @@ typedef struct CSIBuffer {
     uint8_t buf[];
 } CSIBuffer;
 
-// the slot must be 0 or 1
-static void new_buffer(CSIBuffer** buf, size_t slot) {
-    if (slot > 1) {
-        PANIC(CSI_ERROR_INVALID_SLOT);
-    }
-    size_t slot_len = g_csi_context.io_buf_len / 2;
-    *buf = (CSIBuffer*)(((uint8_t*)g_csi_context.io_buf) + slot_len * slot);
+static void new_buffer(CSIBuffer** buf) {
+    size_t buf_len = g_iobuf_allocator.len / g_iobuf_allocator.block_count;
+    *buf = (CSIBuffer*)g_csi_context.iobuf_malloc(buf_len);
     (*buf)->pos = 0;
     (*buf)->filled_len = 0;
-    (*buf)->max_len = slot_len - sizeof(CSIBuffer);
+    (*buf)->max_len = buf_len - sizeof(CSIBuffer);
 }
 
 static int buf_read(void* ctx, void* buf, size_t len, size_t* read_len) {
@@ -254,7 +260,7 @@ exit:
 
 static void new_buf_reader(CSIReader reader, CSIReader* buf_reader) {
     CSIBuffer* buf = NULL;
-    new_buffer(&buf, 0);  // 0 for reader
+    new_buffer(&buf);
     buf->rw.reader = reader;
 
     buf_reader->ctx = buf;
@@ -263,7 +269,7 @@ static void new_buf_reader(CSIReader reader, CSIReader* buf_reader) {
 
 static void new_buf_writer(const CSIWriter writer, CSIWriter* buf_writer) {
     CSIBuffer* buf = NULL;
-    new_buffer(&buf, 1);  // 1 for writer
+    new_buffer(&buf);
     buf->rw.writer = writer;
 
     buf_writer->ctx = buf;
@@ -340,7 +346,7 @@ int csi_receive_request(CSIChannel* channel, CSIRequestPacket* request) {
     CHECK(err);
 
     if (request->payload_len > 0) {
-        request->payload = g_csi_context.malloc(request->payload_len);
+        request->payload = g_csi_context.payload_malloc(request->payload_len);
         if (request->payload == NULL) {
             PANIC(CSI_ERROR_MALLOC);
         }
@@ -361,7 +367,7 @@ int csi_receive_response(CSIChannel* channel, CSIResponsePacket* response) {
     CHECK(err);
 
     if (response->payload_len > 0) {
-        response->payload = g_csi_context.malloc(response->payload_len);
+        response->payload = g_csi_context.payload_malloc(response->payload_len);
         if (response->payload == NULL) {
             PANIC(CSI_ERROR_MALLOC);
         }
@@ -478,7 +484,7 @@ void csi_client_free_response_payload(CSIResponsePacket* response) {
     if (response->payload == NULL) {
         return;
     }
-    g_csi_context.free(response->payload);
+    g_csi_context.payload_free(response->payload);
 }
 
 void csi_server_malloc_response_payload(CSIResponsePacket* response) {
@@ -486,7 +492,7 @@ void csi_server_malloc_response_payload(CSIResponsePacket* response) {
         response->payload = NULL;
         return;
     }
-    response->payload = g_csi_context.malloc(response->payload_len);
+    response->payload = g_csi_context.payload_malloc(response->payload_len);
     if (response->payload == NULL) {
         PANIC(CSI_ERROR_MALLOC);
     }
@@ -518,20 +524,13 @@ int csi_spawn_server(uint64_t index, uint64_t source, size_t offset, size_t leng
     CSIReader reader = {0};
     err = new_pipe_reader(fds[0], &reader);
     CHECK(err);
-    if (g_csi_context.enable_io_buf) {
-        new_buf_reader(reader, &client_channel->reader);
-    } else {
-        client_channel->reader = reader;
-    }
+    new_buf_reader(reader, &client_channel->reader);
 
     CSIWriter writer = {0};
     err = new_pipe_writer(fds2[1], &writer);
     CHECK(err);
-    if (g_csi_context.enable_io_buf) {
-        new_buf_writer(writer, &client_channel->writer);
-    } else {
-        client_channel->writer = writer;
-    }
+    new_buf_writer(writer, &client_channel->writer);
+
 exit:
     return err;
 }
@@ -561,20 +560,12 @@ int csi_run_server(CSIServe serve) {
     CSIReader reader = {0};
     err = new_pipe_reader(inherited_fds[0], &reader);
     CHECK(err);
-    if (g_csi_context.enable_io_buf) {
-        new_buf_reader(reader, &server_channel.reader);
-    } else {
-        server_channel.reader = reader;
-    }
+    new_buf_reader(reader, &server_channel.reader);
 
     CSIWriter writer = {0};
     err = new_pipe_writer(inherited_fds[1], &writer);
     CHECK(err);
-    if (g_csi_context.enable_io_buf) {
-        new_buf_writer(writer, &server_channel.writer);
-    } else {
-        server_channel.writer = writer;
-    }
+    new_buf_writer(writer, &server_channel.writer);
 
     while (true) {
         CSIRequestPacket request;
@@ -583,11 +574,16 @@ int csi_run_server(CSIServe serve) {
         CHECK(err);
         err = serve(&request, &response);
         CHECK(err);
-        g_csi_context.free(request.payload);
+        g_csi_context.payload_free(request.payload);
         err = csi_send_response(&server_channel, &response);
         CHECK(err);
         csi_client_free_response_payload(&response);
     }
 exit:
     return err;
+}
+
+void csi_free_channel(CSIChannel* ch) {
+    iobuf_free(ch->reader.ctx);
+    iobuf_free(ch->writer.ctx);
 }

@@ -14,8 +14,11 @@ or integrate [ckb_script_ipc.c](./ckb_script_ipc.c) and [ckb_script_ipc.h](./ckb
 // 1. Initialize memory allocation
 // You can choose between fixed memory or custom allocator:
 // Option A: Fixed memory buffer
-uint8_t g_malloc_buf[BUFFER_SIZE];
-csi_init_fixed_memory(g_malloc_buf, sizeof(g_malloc_buf));
+static uint8_t g_payload_buf[1024];
+static uint8_t g_io_buf[2048];
+
+csi_init_payload(g_payload_buf, sizeof(g_payload_buf), 2);
+csi_init_iobuf(g_io_buf, sizeof(g_io_buf), 2);
 
 // Option B: Custom allocator
 // csi_init_malloc(malloc, free);
@@ -81,12 +84,15 @@ static int serve_callback(const CSIRequestPacket* request, CSIResponsePacket* re
     return CSI_SUCCESS;
 }
 
-uint8_t g_malloc_buf[BUFFER_SIZE];
-
 int main() {
     // Initialize memory management
     // Option A: Fixed memory buffer
-    csi_init_fixed_memory(g_malloc_buf, sizeof(g_malloc_buf));
+    static uint8_t g_payload_buf[1024];
+    static uint8_t g_io_buf[2048];
+
+    csi_init_payload(g_payload_buf, sizeof(g_payload_buf), 2);
+    csi_init_iobuf(g_io_buf, sizeof(g_io_buf), 2);
+
     // Option B: Custom allocator
     // csi_init_malloc(malloc, free);
 
@@ -97,18 +103,17 @@ int main() {
 
 See detailed [client example](./examples/client.c) and [server example](./examples/server.c).
 
-## Memory Allocation
+## Payload Memory Allocation
 This project requires dynamic memory allocation for handling request and response payloads. Since many on-chain C scripts don't have access to `malloc` by default, we provide a simple fixed memory allocator.
 
-Initialize the fixed memory allocator with:
+Initialize the fixed memory allocator for payload:
 ```C
-void csi_init_fixed_memory(void* buf, size_t len);
+void csi_init_payload(void* buf, size_t len, size_t block_count);
 ```
 
 The fixed memory allocator has the following characteristics:
-- Maximum allocation size: `len/2`
-- Maximum number of concurrent allocations: 2
-- Memory must be 2-byte aligned
+- Maximum allocation size: `len/block_count`
+- Maximum number of concurrent allocations: block_count
 
 Memory management must be handled in two specific places:
 
@@ -142,16 +147,21 @@ static int serve_callback(const CSIRequestPacket* request, CSIResponsePacket* re
 ```
 The fixed allocator is designed for simple IPC scenarios - if you need more complex memory management, consider implementing a custom allocator.
 
-## IO Buffer
-By default, the library performs unbuffered I/O operations, which can result in frequent system calls to `read` and `write`. In high-throughput scenarios, these frequent system calls can impact performance.
+The `block_count` parameter determines how many concurrent memory allocations are supported. For most IPC scenarios, a value of 2 is sufficient because:
 
+1. One block is needed for the request payload
+2. One block is needed for the response payload
+
+However, if your application requires handling multiple concurrent requests or needs to maintain multiple payloads in memory simultaneously, you should increase the `block_count` accordingly.
+
+## IO Buffer Memory Allocation
+Unbuffered I/O operations trigger frequent `read` and `write` system calls, which can become a performance bottleneck in high-throughput scenarios.
 To optimize I/O performance, you can enable buffering by providing a pre-allocated buffer:
 ```c
-uint8_t g_io_buf[1024];
+static uint8_t g_io_buf[2048];
 
 // ...
-csi_init_io_buffer(g_io_buf, sizeof(g_io_buf));
+csi_init_iobuf(g_io_buf, sizeof(g_io_buf), 2);
 ```
 
-The buffer must be at least 1024 bytes in size.
-
+How to choose `block_count`? Each channel requires one block for request payloads and one block for response payloads, so the total number of blocks should be at least `2 * number_of_concurrent_channels`. Normally, a value of 2 (one channel) is sufficient.

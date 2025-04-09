@@ -3,8 +3,8 @@
 #include "ckb_syscalls.h"
 #include "ckb_script_ipc.h"
 
-uint8_t g_malloc_buf[1024];
-uint8_t g_io_buf[2048];
+static uint8_t g_payload_buf[1024];
+static uint8_t g_io_buf[2048];
 
 static int serve_call_back(const CSIRequestPacket* request, CSIResponsePacket* response) {
     printf("serve callback");
@@ -28,7 +28,7 @@ static int serve_call_back(const CSIRequestPacket* request, CSIResponsePacket* r
 
 int main() {
     // initialize the fixed memory allocator
-    csi_init_fixed_memory(g_malloc_buf, sizeof(g_malloc_buf));
-    csi_init_io_buffer(g_io_buf, sizeof(g_io_buf));
+    csi_init_payload(g_payload_buf, sizeof(g_payload_buf), 2);
+    csi_init_iobuf(g_io_buf, sizeof(g_io_buf), 2);
     return csi_run_server(serve_call_back);
 }
