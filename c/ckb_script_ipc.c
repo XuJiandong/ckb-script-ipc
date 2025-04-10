@@ -193,7 +193,11 @@ typedef struct CSIBuffer {
 
 static void new_buffer(CSIBuffer** buf) {
     size_t buf_len = g_iobuf_allocator.len / g_iobuf_allocator.block_count;
-    *buf = (CSIBuffer*)g_csi_context.iobuf_malloc(buf_len);
+    void* ptr = g_csi_context.iobuf_malloc(buf_len);
+    if (ptr == NULL) {
+        PANIC(CSI_ERROR_MALLOC);
+    }
+    *buf = (CSIBuffer*)ptr;
     (*buf)->pos = 0;
     (*buf)->filled_len = 0;
     (*buf)->max_len = buf_len - sizeof(CSIBuffer);
