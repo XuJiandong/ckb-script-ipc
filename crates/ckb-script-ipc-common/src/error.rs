@@ -78,7 +78,7 @@ pub enum ProtocolErrorCode {
     UnknownSysError = 21,
     /// Unexpected EOF
     UnexpectedEof = 22,
-    /// VQL error: incomplete VLQ sequence
+    /// VLQ error: incomplete VLQ sequence
     IncompleteVlqSeq = 23,
     /// VLQ error: decoding overflow
     DecodeVlqOverflow = 24,

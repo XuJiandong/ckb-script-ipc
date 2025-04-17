@@ -6,7 +6,7 @@ TOP := $(cur_dir)
 # RUSTFLAGS that are likely to be tweaked by developers. For example,
 # while we enable debug logs by default here, some might want to strip them
 # for minimal code size / consumed cycles.
-CUSTOM_RUSTFLAGS := --cfg debug_assertions
+CUSTOM_RUSTFLAGS := -C debug_assertions
 # RUSTFLAGS that are less likely to be tweaked by developers. Most likely
 # one would want to keep the default values here.
 FULL_RUSTFLAGS := -C target-feature=+zba,+zbb,+zbc,+zbs,-a $(CUSTOM_RUSTFLAGS)
@@ -61,7 +61,7 @@ fmt:
 # Arbitrary cargo command is supported here. For example:
 #
 # make cargo CARGO_CMD=expand CARGO_ARGS="--ugly"
-# 
+#
 # Invokes:
 # cargo expand --ugly
 CARGO_CMD :=

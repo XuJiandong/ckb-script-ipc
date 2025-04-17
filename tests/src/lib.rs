@@ -22,6 +22,9 @@ mod tests_service;
 #[cfg(test)]
 mod tests_native;
 
+#[cfg(test)]
+mod tests_c_impl;
+
 // The exact same Loader code from capsule's template, except that
 // now we use MODE as the environment variable
 const TEST_ENV_VAR: &str = "MODE";

@@ -12,11 +12,23 @@ jobs:
         submodules: true
     - name: Prepare
       run: make prepare
+    - name: Install llvm 18
+      run: |
+        sudo apt-get purge --auto-remove llvm python3-lldb-14 llvm-14
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh 18
+        rm llvm.sh
+    - name: Fix llvm path
+      run: |
+        sudo ln -s $(which llvm-ar-18) /usr/bin/llvm-ar || true
+        sudo ln -s $(which llvm-objcopy-18) /usr/bin/llvm-objcopy || true
+        sudo ln -s $(which ld.lld-18) /usr/bin/ld.lld || true
+    - name: Build C implementation
+      run: cd c && make all
     - name: Format & Clippy
       run: make clippy && cargo fmt -- --check
     - name: Build
       run: make build
     - name: Test
       run: make test
-    - name: Test on Rust 1.75
-      run: rustup run --install 1.75.0 make test

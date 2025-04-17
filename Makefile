@@ -6,7 +6,7 @@ TOP := $(cur_dir)
 # RUSTFLAGS that are likely to be tweaked by developers. For example,
 # while we enable debug logs by default here, some might want to strip them
 # for minimal code size / consumed cycles.
-CUSTOM_RUSTFLAGS := --cfg debug_assertions
+CUSTOM_RUSTFLAGS := -C debug_assertions
 # Additional cargo args to append here. For example, one can use
 # make test CARGO_ARGS="-- --nocapture" so as to inspect data emitted to
 # stdout in unit tests
@@ -76,6 +76,7 @@ clippy:
 
 fmt:
 	cargo fmt $(CARGO_ARGS)
+	make -C c fmt
 
 # Arbitrary cargo command is supported here. For example:
 #
@@ -120,12 +121,8 @@ generate:
 		mv Cargo.toml.new Cargo.toml; \
 	fi
 
-debugger:
-	ckb-debugger --bin build/release/ckb-script-ipc-demo
-
 prepare:
 	rustup target add riscv64imac-unknown-none-elf
-	cargo install --git https://github.com/nervosnetwork/ckb-standalone-debugger ckb-debugger
 
 # Generate checksum info for reproducible build
 CHECKSUM_FILE := build/checksums-$(MODE).txt
