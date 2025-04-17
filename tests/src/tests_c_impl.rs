@@ -2,13 +2,12 @@ use crate::Loader;
 use ckb_testtool::ckb_types::{bytes::Bytes, core::TransactionBuilder, packed::*, prelude::*};
 use ckb_testtool::context::Context;
 
-#[test]
-fn test_c_impl_examples() {
+fn test_c_impl(client_path: &str, server_path: &str) {
     let mut context = Context::default();
-    let server_bin: Bytes = Loader::default().load_binary("../../c/build/examples/server");
+    let server_bin: Bytes = Loader::default().load_binary(server_path);
     let server_out_point = context.deploy_cell(server_bin);
 
-    let client_bin: Bytes = Loader::default().load_binary("../../c/build/examples/client");
+    let client_bin: Bytes = Loader::default().load_binary(client_path);
     let client_out_point = context.deploy_cell(client_bin);
 
     // prepare scripts
@@ -57,4 +56,17 @@ fn test_c_impl_examples() {
         .verify_tx(&tx, 10_000_000)
         .expect("pass verification");
     println!("consume cycles: {}", cycles);
+}
+
+#[test]
+fn test_c_impl_examples() {
+    test_c_impl(
+        "../../c/build/examples/client",
+        "../../c/build/examples/server",
+    );
+}
+
+#[test]
+fn test_c_impl_tests() {
+    test_c_impl("../../c/build/tests/client", "../../c/build/tests/server");
 }

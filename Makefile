@@ -76,6 +76,7 @@ clippy:
 
 fmt:
 	cargo fmt $(CARGO_ARGS)
+	make -C c fmt
 
 # Arbitrary cargo command is supported here. For example:
 #

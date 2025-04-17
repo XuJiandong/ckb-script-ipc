@@ -16,7 +16,7 @@ CFLAGS_DECLARATION_ONLY = -DCKB_STDLIB_NO_SYSCALL_IMPL -DCKB_DECLARATION_ONLY
 
 LDFLAGS := -Wl,-static -Wl,--gc-sections -nostdlib
 
-all: out lib examples
+all: out lib examples tests
 
 
 lib: out build/libckb_script_ipc.a
@@ -30,11 +30,20 @@ build/libckb_script_ipc.a: build/ckb_script_ipc.o
 
 examples: build/examples/client build/examples/server
 
+
 build/examples/client: examples/client.c build/libckb_script_ipc.a
 	$(CC) $(CFLAGS) $(LDFLAGS) -o build/examples/client examples/client.c build/libckb_script_ipc.a
 
 build/examples/server: examples/server.c build/libckb_script_ipc.a
 	$(CC) $(CFLAGS) $(LDFLAGS) -o build/examples/server examples/server.c build/libckb_script_ipc.a
+
+tests: build/tests/client build/tests/server
+
+build/tests/client: tests/client.c build/libckb_script_ipc.a
+	$(CC) $(CFLAGS) $(LDFLAGS) -o build/tests/client tests/client.c build/libckb_script_ipc.a
+
+build/tests/server: tests/server.c build/libckb_script_ipc.a
+	$(CC) $(CFLAGS) $(LDFLAGS) -o build/tests/server tests/server.c build/libckb_script_ipc.a
 
 clean:
 	rm -rf build
@@ -49,4 +58,10 @@ fmt:
 		ckb_script_ipc.h \
 		ckb_script_ipc.c \
 		examples/client.c \
-		examples/server.c
+		examples/server.c \
+		tests/client.c \
+		tests/server.c
+
+scan-build:
+	scan-build make all
+

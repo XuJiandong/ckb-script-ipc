@@ -4,6 +4,8 @@
 #define __CKB_SCRIPT_IPC_H__
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
+
 /**
  * Error Code.
  * The functions in this library return this error code to indicate success or failure.
@@ -116,14 +118,14 @@ typedef struct CSIWriter {
 typedef struct CSIRequestPacket {
     uint64_t version;
     uint64_t method_id;
-    size_t payload_len;
+    uint64_t payload_len;
     void* payload;
 } CSIRequestPacket;
 
 typedef struct CSIResponsePacket {
     uint64_t version;
     uint64_t error_code;
-    size_t payload_len;
+    uint64_t payload_len;
     void* payload;
 } CSIResponsePacket;
 

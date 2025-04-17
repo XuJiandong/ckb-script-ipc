@@ -40,7 +40,7 @@ typedef struct CSIContext {
     CSIPanic panic;
 } CSIContext;
 
-static CSIContext g_csi_context = {0};
+static CSIContext g_csi_context = {.panic = csi_default_panic};
 
 typedef struct FixedAllocator {
     // support up to 64 blocks
@@ -124,7 +124,10 @@ void csi_init_malloc(CSIMalloc malloc, CSIFree free) {
 
 void csi_init_panic(CSIPanic panic) { g_csi_context.panic = panic; }
 
-void csi_default_panic(int exit_code) { ckb_exit(exit_code); }
+void csi_default_panic(int exit_code) {
+    printf("panic in IPC, error code: %d", exit_code);
+    ckb_exit(exit_code);
+}
 
 static void* iobuf_malloc(size_t len) { return fixed_allocator_malloc(&g_iobuf_allocator, len); }
 
@@ -196,11 +199,12 @@ static void new_buffer(CSIBuffer** buf) {
     void* ptr = g_csi_context.iobuf_malloc(buf_len);
     if (ptr == NULL) {
         PANIC(CSI_ERROR_MALLOC);
+    } else {
+        *buf = (CSIBuffer*)ptr;
+        (*buf)->pos = 0;
+        (*buf)->filled_len = 0;
+        (*buf)->max_len = buf_len - sizeof(CSIBuffer);
     }
-    *buf = (CSIBuffer*)ptr;
-    (*buf)->pos = 0;
-    (*buf)->filled_len = 0;
-    (*buf)->max_len = buf_len - sizeof(CSIBuffer);
 }
 
 static int buf_read(void* ctx, void* buf, size_t len, size_t* read_len) {
@@ -213,7 +217,7 @@ static int buf_read(void* ctx, void* buf, size_t len, size_t* read_len) {
         CHECK(err);
         buffer->pos = 0;
     }
-    if (buffer->pos > buffer->filled_len || buffer->filled_len > buffer->max_len) {
+    if (buffer->pos >= buffer->filled_len || buffer->filled_len > buffer->max_len) {
         PANIC(CSI_ERROR_INTERNAL);
     }
     size_t reaming_len = buffer->filled_len - buffer->pos;
@@ -399,7 +403,7 @@ exit:
 
 int csi_read_vlq(CSIReader* reader, uint64_t* value) {
     int err = 0;
-    uint8_t peek;
+    uint8_t peek = 0;
     uint8_t buf[MAX_VLQ_LEN];
     size_t buf_len = 0;
 
@@ -573,8 +577,8 @@ int csi_run_server(CSIServe serve) {
     new_buf_writer(writer, &server_channel.writer);
 
     while (true) {
-        CSIRequestPacket request;
-        CSIResponsePacket response;
+        CSIRequestPacket request = {0};
+        CSIResponsePacket response = {0};
         err = csi_receive_request(&server_channel, &request);
         CHECK(err);
         err = serve(&request, &response);
