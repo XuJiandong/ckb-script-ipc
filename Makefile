@@ -124,6 +124,7 @@ generate:
 prepare:
 	rustup target add riscv64imac-unknown-none-elf
 	rustup component add clippy
+	rustup component add rustfmt
 
 # Generate checksum info for reproducible build
 CHECKSUM_FILE := build/checksums-$(MODE).txt
