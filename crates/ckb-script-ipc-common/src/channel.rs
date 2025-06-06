@@ -65,7 +65,7 @@ impl<R: Read, W: Write> Channel<R, W> {
         loop {
             let result = self
                 .receive_request()
-                .and_then(|req| serve.serve(req).map_err(Into::into))
+                .and_then(|req| serve.serve(req))
                 .and_then(|resp| self.send_response(resp));
 
             match result {

@@ -54,6 +54,10 @@ pub fn spawn_server(
 
     let argc = argv.len();
     let mut process_id: u64 = 0;
+    // Convert CStr pointers to raw pointers for syscall
+    // Note: c_char is platform-specific (i8 on most platforms, u8 on some)
+    // The cast is necessary for FFI compatibility but triggers clippy warning
+    #[allow(clippy::unnecessary_cast)]
     let argv_ptr: Vec<*const i8> = argv.iter().map(|&e| e.as_ptr() as *const i8).collect();
     let mut spgs = syscalls::SpawnArgs {
         argc: argc as u64,
