@@ -597,7 +597,7 @@ dependencies = [
 
 [[package]]
 name = "ckb-script-ipc"
-version = "1.0.1"
+version = "1.0.3"
 dependencies = [
  "ckb-script-ipc-common",
  "proc-macro2",
@@ -609,7 +609,7 @@ dependencies = [
 
 [[package]]
 name = "ckb-script-ipc-common"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "ckb-rust-std",
  "ckb-std",
