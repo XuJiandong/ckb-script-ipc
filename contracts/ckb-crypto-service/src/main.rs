@@ -203,7 +203,8 @@ impl CkbCrypto for CryptoServer {
         use k256::ecdsa::{Signature, VerifyingKey};
 
         let signature = Signature::from_slice(&signature).map_err(|_| CryptoError::InvalidSig)?;
-        let vk = VerifyingKey::from_sec1_bytes(&public_key).unwrap();
+        let vk =
+            VerifyingKey::from_sec1_bytes(&public_key).map_err(|_| CryptoError::InvalidPubkey)?;
         match vk.verify_prehash(&prehash, &signature) {
             Ok(_) => Ok(()),
             Err(_) => Err(CryptoError::VerifyFailed),
