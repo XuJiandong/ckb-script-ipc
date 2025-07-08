@@ -50,7 +50,7 @@ impl CryptoInfo {
         let (read_pipe, write_pipe) = spawn_cell_server(
             &args[0..32],
             ckb_std::ckb_types::core::ScriptHashType::Data2,
-            &[CString::new("demo").unwrap().as_ref()],
+            &[CString::new("").unwrap().as_ref()],
         )
         .unwrap();
         let args = args[32..].to_vec();
@@ -227,15 +227,14 @@ fn unit_test_secp256k1_verify(crypto_info: CryptoInfo) -> i8 {
     let signature = {
         let len = witness[0] as usize;
         let buf = witness[1..len + 1].to_vec();
-        witness = &witness[len + 1..];
         buf
     };
 
-    let recovery_id = witness[0];
-    match crypto_cli.secp256k1_verify(crypto_info.args, prehash, signature, recovery_id) {
+    match crypto_cli.secp256k1_verify(crypto_info.args.clone(), prehash.clone(), signature.clone())
+    {
         Ok(_) => 0,
         Err(e) => {
-            error!("secp256k1_recovery error: {:?} ", e);
+            error!("secp256k1_verify error: {:?} ", e);
             1
         }
     }
