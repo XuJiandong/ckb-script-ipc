@@ -198,22 +198,16 @@ impl CkbCrypto for CryptoServer {
         public_key: Vec<u8>,
         prehash: Vec<u8>,
         signature: Vec<u8>,
-        recovery_id: u8,
     ) -> Result<(), CryptoError> {
-        use k256::ecdsa::{RecoveryId, Signature, VerifyingKey};
+        use k256::ecdsa::signature::hazmat::PrehashVerifier;
+        use k256::ecdsa::{Signature, VerifyingKey};
 
         let signature = Signature::from_slice(&signature).map_err(|_| CryptoError::InvalidSig)?;
-        let recovery_id =
-            RecoveryId::from_byte(recovery_id).ok_or(CryptoError::InvalidRecoveryId)?;
-        let verify_key = VerifyingKey::recover_from_prehash(&prehash, &signature, recovery_id)
-            .map_err(|_| CryptoError::RecoveryFailed)?
-            .to_sec1_bytes()
-            .to_vec();
-
-        if public_key != verify_key {
-            Err(CryptoError::VerifyFailed)
-        } else {
-            Ok(())
+        let vk =
+            VerifyingKey::from_sec1_bytes(&public_key).map_err(|_| CryptoError::InvalidPubkey)?;
+        match vk.verify_prehash(&prehash, &signature) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(CryptoError::VerifyFailed),
         }
     }
 
