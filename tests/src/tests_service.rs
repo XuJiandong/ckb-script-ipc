@@ -33,7 +33,7 @@ fn run_service_test(cmd: Cmd, args: Vec<u8>, witness: Vec<u8>) {
     // prepare cells
     let input_out_point = context.create_cell(
         CellOutput::new_builder()
-            .capacity(1000u64.pack())
+            .capacity(1000u64)
             .lock(lock_script.clone())
             .build(),
         Bytes::new(),
@@ -43,11 +43,11 @@ fn run_service_test(cmd: Cmd, args: Vec<u8>, witness: Vec<u8>) {
         .build();
     let outputs = vec![
         CellOutput::new_builder()
-            .capacity(500u64.pack())
+            .capacity(500u64)
             .lock(lock_script.clone())
             .build(),
         CellOutput::new_builder()
-            .capacity(500u64.pack())
+            .capacity(500u64)
             .lock(lock_script)
             .build(),
     ];
@@ -69,7 +69,7 @@ fn run_service_test(cmd: Cmd, args: Vec<u8>, witness: Vec<u8>) {
         .cell_dep(
             CellDep::new_builder()
                 .out_point(service_outpoint)
-                .dep_type(DepType::Code.into())
+                .dep_type(DepType::Code)
                 .build(),
         )
         .build();

@@ -20,7 +20,7 @@ fn test_ckb_script_ipc_demo() {
     // prepare cells
     let input_out_point = context.create_cell(
         CellOutput::new_builder()
-            .capacity(1000u64.pack())
+            .capacity(1000u64)
             .lock(lock_script.clone())
             .build(),
         Bytes::new(),
@@ -30,11 +30,11 @@ fn test_ckb_script_ipc_demo() {
         .build();
     let outputs = vec![
         CellOutput::new_builder()
-            .capacity(500u64.pack())
+            .capacity(500u64)
             .lock(lock_script.clone())
             .build(),
         CellOutput::new_builder()
-            .capacity(500u64.pack())
+            .capacity(500u64)
             .lock(lock_script)
             .build(),
     ];
@@ -71,7 +71,7 @@ fn test_unit_tests() {
     // prepare cells
     let input_out_point = context.create_cell(
         CellOutput::new_builder()
-            .capacity(1000u64.pack())
+            .capacity(1000u64)
             .lock(lock_script.clone())
             .build(),
         Bytes::new(),
@@ -81,11 +81,11 @@ fn test_unit_tests() {
         .build();
     let outputs = vec![
         CellOutput::new_builder()
-            .capacity(500u64.pack())
+            .capacity(500u64)
             .lock(lock_script.clone())
             .build(),
         CellOutput::new_builder()
-            .capacity(500u64.pack())
+            .capacity(500u64)
             .lock(lock_script)
             .build(),
     ];

@@ -9,7 +9,7 @@ use std::sync::Mutex;
 
 use ckb_vm::cost_model::estimate_cycles;
 use ckb_vm::registers::{A0, A1, A2, A7};
-use ckb_vm::{Bytes, Memory, Register, SupportMachine, Syscalls};
+use ckb_vm::{Bytes, DefaultMachineRunner, Memory, Register, SupportMachine, Syscalls};
 
 use crate::io::{Error, ErrorKind, Read, Write};
 
@@ -362,7 +362,7 @@ fn ckb_vm_entry(
     read_pipe: Pipe,
     write_pipe: Pipe,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let asm_core = ckb_vm::machine::asm::AsmCoreMachine::new(
+    let asm_core = <Box<ckb_vm::machine::asm::AsmCoreMachine> as SupportMachine>::new(
         ckb_vm::ISA_IMC | ckb_vm::ISA_B | ckb_vm::ISA_MOP,
         ckb_vm::machine::VERSION2,
         u64::MAX,
