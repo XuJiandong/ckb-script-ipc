@@ -7,16 +7,23 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write     # Required for OIDC token exchange
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - uses: rust-lang/crates-io-auth-action@v1
+      id: auth
+
     - name: Publish ckb-script-ipc
       env:
-        CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
       run: cargo publish -p ckb-script-ipc
     - name: Publish ckb-script-ipc-common
       env:
-        CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
       run: cargo publish -p ckb-script-ipc-common
