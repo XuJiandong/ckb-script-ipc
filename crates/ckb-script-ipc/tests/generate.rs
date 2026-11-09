@@ -71,10 +71,12 @@ fn test_conditionally_compiled_method() {
     use ckb_script_ipc_common::ipc::Serve;
 
     let request =
-        serde_json::from_str::<ConditionalServiceRequest>(r#"{"Enabled":{"value":41}}"#)
-            .unwrap();
+        serde_json::from_str::<ConditionalServiceRequest>(r#"{"Enabled":{"value":41}}"#).unwrap();
     let response = ConditionalServer.server().serve(request).unwrap();
     let ConditionalServiceResponse::Enabled(value) = response;
     assert_eq!(value, 42);
-    assert_eq!(serde_json::to_string(&response).unwrap(), r#"{"Enabled":42}"#);
+    assert_eq!(
+        serde_json::to_string(&response).unwrap(),
+        r#"{"Enabled":42}"#
+    );
 }

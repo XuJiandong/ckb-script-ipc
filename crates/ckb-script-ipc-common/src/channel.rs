@@ -289,8 +289,8 @@ mod tests {
         let mut channel = Channel::new(bytes.as_slice(), Vec::<u8>::new());
         assert_eq!(channel.receive_response::<u32>().unwrap(), 42);
 
-        let bytes = ResponsePacket::new(ProtocolErrorCode::DeserializeError as u64, vec![])
-            .serialize();
+        let bytes =
+            ResponsePacket::new(ProtocolErrorCode::DeserializeError as u64, vec![]).serialize();
         let mut channel = Channel::new(bytes.as_slice(), Vec::<u8>::new());
         assert!(matches!(
             channel.receive_response::<()>(),
