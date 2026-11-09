@@ -149,17 +149,83 @@ impl ResponsePacket {
 }
 
 pub fn read_next_vlq(reader: &mut impl Read) -> Result<u64, IpcError> {
-    let mut peek = [0u8; 1];
-    let mut buf = vec![];
-    loop {
-        let n = reader.read(&mut peek).map_err(|_| IpcError::ReadVlqError)?;
+    let mut buf = [0u8; 10];
+    for i in 0..buf.len() {
+        let n = reader
+            .read(&mut buf[i..i + 1])
+            .map_err(|_| IpcError::ReadVlqError)?;
         if n == 0 {
-            break;
+            return Err(IpcError::IncompleteVlqSeq);
         }
-        buf.push(peek[0]);
-        if peek[0] & 0x80 == 0 {
-            break;
+        if buf[i] & 0x80 == 0 {
+            return vlq_decode(&buf[..i + 1]);
         }
     }
-    vlq_decode(&buf)
+    Err(IpcError::DecodeVlqOverflow)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_read_next_vlq_stops_after_ten_continuation_bytes() {
+        struct ContinuationReader(usize);
+
+        impl Read for ContinuationReader {
+            fn read(&mut self, buf: &mut [u8]) -> Result<usize, crate::io::Error> {
+                assert!(self.0 < 10, "must not read an eleventh byte");
+                self.0 += 1;
+                buf[0] = 0x80;
+                Ok(1)
+            }
+        }
+
+        let mut reader = ContinuationReader(0);
+        assert!(matches!(
+            read_next_vlq(&mut reader),
+            Err(IpcError::DecodeVlqOverflow)
+        ));
+        assert_eq!(reader.0, 10);
+    }
+
+    #[test]
+    fn test_read_next_vlq_tenth_byte_boundaries() {
+        for terminal in 0..=u8::MAX {
+            let mut bytes = [0x80; 11];
+            bytes[9] = terminal;
+            bytes[10] = 42;
+            let mut reader = bytes.as_slice();
+            let result = read_next_vlq(&mut reader);
+            match terminal {
+                0 => assert_eq!(result.unwrap(), 0),
+                1 => assert_eq!(result.unwrap(), 1u64 << 63),
+                _ => assert!(matches!(result, Err(IpcError::DecodeVlqOverflow))),
+            }
+            assert_eq!(reader, &[42]);
+        }
+    }
+
+    #[test]
+    fn test_read_next_vlq_valid_values() {
+        for value in [0, 127, 128, 16384, u64::MAX / 2, 1u64 << 63, u64::MAX] {
+            let mut bytes = vlq_encode(value);
+            bytes.push(42);
+            let mut reader = bytes.as_slice();
+            assert_eq!(read_next_vlq(&mut reader).unwrap(), value);
+            assert_eq!(reader, &[42]);
+        }
+    }
+
+    #[test]
+    fn test_read_next_vlq_incomplete_sequence() {
+        let bytes = [0x80; 9];
+        for len in 0..=bytes.len() {
+            let mut reader = &bytes[..len];
+            assert!(matches!(
+                read_next_vlq(&mut reader),
+                Err(IpcError::IncompleteVlqSeq)
+            ));
+        }
+    }
 }

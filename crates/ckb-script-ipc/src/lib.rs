@@ -158,10 +158,24 @@ pub fn service(_attr: TokenStream, input: TokenStream) -> TokenStream {
         ref ipcs,
     } = parse_macro_input!(input as Service);
 
-    let camel_case_fn_names: &Vec<_> = &ipcs
+    let camel_case_idents = ipcs
         .iter()
-        .map(|ipc| snake_to_camel(&ipc.ident.unraw().to_string()))
-        .collect();
+        .map(|ipc| {
+            let name = snake_to_camel(&ipc.ident.unraw().to_string());
+            let mut ident = syn::parse_str::<Ident>(&name).map_err(|_| {
+                syn::Error::new(
+                    ipc.ident.span(),
+                    "method name cannot be converted to a valid IPC variant name",
+                )
+            })?;
+            ident.set_span(ipc.ident.span());
+            Ok(ident)
+        })
+        .collect::<syn::Result<Vec<_>>>();
+    let camel_case_idents = match camel_case_idents {
+        Ok(idents) => idents,
+        Err(error) => return error.to_compile_error().into(),
+    };
     let args: &[&[PatType]] = &ipcs.iter().map(|ipc| &*ipc.args).collect::<Vec<_>>();
 
     let methods = ipcs.iter().map(|ipc| &ipc.ident).collect::<Vec<_>>();
@@ -195,11 +209,7 @@ pub fn service(_attr: TokenStream, input: TokenStream) -> TokenStream {
             .iter()
             .map(|args| args.iter().map(|arg| &*arg.pat).collect())
             .collect::<Vec<_>>(),
-        camel_case_idents: &ipcs
-            .iter()
-            .zip(camel_case_fn_names.iter())
-            .map(|(ipc, name)| Ident::new(name, ipc.ident.span()))
-            .collect::<Vec<_>>(),
+        camel_case_idents: &camel_case_idents,
     }
     .into_token_stream()
     .into()
@@ -451,8 +461,13 @@ impl ToTokens for ServiceGenerator<'_> {
 }
 
 fn snake_to_camel(ident_str: &str) -> String {
-    ident_str
-        .split('_')
-        .map(|word| word[..1].to_uppercase() + &word[1..].to_lowercase())
-        .collect()
+    let mut name = String::new();
+    for word in ident_str.split('_') {
+        let mut chars = word.chars();
+        if let Some(first) = chars.next() {
+            name.extend(first.to_uppercase());
+            name.push_str(&chars.as_str().to_lowercase());
+        }
+    }
+    name
 }

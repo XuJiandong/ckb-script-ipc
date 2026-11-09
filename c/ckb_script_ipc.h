@@ -28,6 +28,7 @@ typedef enum CSIErrorCode {
     CSI_ERROR_FA_TOO_MANY_BLOCK,
     CSI_ERROR_FA_NOT_ALIGNED,
     CSI_ERROR_FA_INVALID_BLOCK_COUNT,
+    CSI_ERROR_UNEXPECTED_EOF,
 } CSIErrorCode;
 
 typedef void* (*CSIMalloc)(size_t len);
@@ -145,6 +146,8 @@ typedef struct CSIChannel {
  * @param request: The request packet to send
  * @param response: Pointer to store the received response packet
  * @return 0 for success, non-zero for failure
+ *         Response error codes greater than INT_MAX return CSI_ERROR_INTERNAL;
+ *         the original code is preserved in response->error_code.
  *
  * Note: The caller is responsible for:
  * - Freeing the response's payload using csi_free_response() when it's no longer needed

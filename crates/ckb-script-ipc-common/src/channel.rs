@@ -73,8 +73,8 @@ impl<R: Read, W: Write> Channel<R, W> {
                 Err(e) => {
                     #[cfg(feature = "enable-logging")]
                     log::error!("Error in execute loop: {:?}", e);
-                    // notify client
-                    self.send_error_code(e.clone().into()).unwrap();
+                    // The peer may be disconnected; preserve the original error.
+                    let _ = self.send_error_code(e.clone().into());
                     return Err(e);
                 }
             }
@@ -146,7 +146,7 @@ impl<R: Read, W: Write> Channel<R, W> {
         log::info!("send request: {:?}", packet);
 
         let bytes = packet.serialize();
-        self.writer.write(&bytes)?;
+        self.writer.write_all(&bytes)?;
         self.writer.flush()?;
         Ok(())
     }
@@ -171,7 +171,7 @@ impl<R: Read, W: Write> Channel<R, W> {
         log::info!("send request: {:?}", packet);
 
         let bytes = packet.serialize();
-        self.writer.write(&bytes)?;
+        self.writer.write_all(&bytes)?;
         self.writer.flush()?;
         Ok(())
     }
@@ -182,7 +182,7 @@ impl<R: Read, W: Write> Channel<R, W> {
         log::info!("send response: {:?}", packet);
 
         let bytes = packet.serialize();
-        self.writer.write(&bytes)?;
+        self.writer.write_all(&bytes)?;
         self.writer.flush()?;
         Ok(())
     }
@@ -194,7 +194,7 @@ impl<R: Read, W: Write> Channel<R, W> {
         #[cfg(feature = "enable-logging")]
         log::info!("send error code: {:?}", error_code as u64);
         let bytes = packet.serialize();
-        self.writer.write(&bytes)?;
+        self.writer.write_all(&bytes)?;
         self.writer.flush()?;
         Ok(())
     }
@@ -264,6 +264,58 @@ impl<R: Read, W: Write> Channel<R, W> {
 mod tests {
     use super::*;
     use alloc::vec::Vec;
+
+    #[derive(Default)]
+    struct ShortWriter {
+        bytes: Vec<u8>,
+        flush_count: usize,
+    }
+
+    impl Write for ShortWriter {
+        fn write(&mut self, buf: &[u8]) -> Result<usize, crate::io::Error> {
+            let len = buf.len().min(7);
+            self.bytes.extend_from_slice(&buf[..len]);
+            Ok(len)
+        }
+
+        fn flush(&mut self) -> Result<(), crate::io::Error> {
+            self.flush_count += 1;
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_packet_sends_complete_short_writes() {
+        let mut channel = Channel::new(&[][..], ShortWriter::default());
+        // Large packets bypass BufWriter's buffer and expose short writes directly.
+        let payload = "x".repeat(channel.writer.capacity() * 2);
+        let json = serde_json::to_string(&payload).unwrap();
+
+        channel.send_request(&payload).unwrap();
+        channel.send_json_request(&json).unwrap();
+        channel.send_response(&payload).unwrap();
+        channel
+            .send_error_code(ProtocolErrorCode::DeserializeError)
+            .unwrap();
+
+        let writer = channel.writer.get_ref();
+        assert_eq!(writer.flush_count, 4);
+        let mut bytes = writer.bytes.as_slice();
+        for _ in 0..2 {
+            let request = RequestPacket::read_from(&mut bytes).unwrap();
+            assert_eq!(request.payload(), json.as_bytes());
+        }
+        let response = ResponsePacket::read_from(&mut bytes).unwrap();
+        assert_eq!(response.error_code(), 0);
+        assert_eq!(response.payload(), json.as_bytes());
+        let error = ResponsePacket::read_from(&mut bytes).unwrap();
+        assert_eq!(
+            error.error_code(),
+            ProtocolErrorCode::DeserializeError as u64
+        );
+        assert!(error.payload().is_empty());
+        assert!(bytes.is_empty());
+    }
 
     #[test]
     fn test_unknown_response_error_codes() {
