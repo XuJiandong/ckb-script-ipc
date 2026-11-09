@@ -259,3 +259,42 @@ impl<R: Read, W: Write> Channel<R, W> {
         Ok(String::from_utf8_lossy(packet.payload()).into_owned())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::vec::Vec;
+
+    #[test]
+    fn test_unknown_response_error_codes() {
+        for code in [10, 19, 30, 50, u64::MAX] {
+            let bytes = ResponsePacket::new(code, vec![]).serialize();
+            let mut channel = Channel::new(bytes.as_slice(), Vec::<u8>::new());
+            assert!(matches!(
+                channel.receive_response::<()>(),
+                Err(IpcError::ProtocolError(ProtocolErrorCode::UnknownError))
+            ));
+
+            let mut channel = Channel::new(bytes.as_slice(), Vec::<u8>::new());
+            assert!(matches!(
+                channel.receive_json_response(),
+                Err(IpcError::ProtocolError(ProtocolErrorCode::UnknownError))
+            ));
+        }
+    }
+
+    #[test]
+    fn test_known_response_codes() {
+        let bytes = ResponsePacket::new(0, b"42".to_vec()).serialize();
+        let mut channel = Channel::new(bytes.as_slice(), Vec::<u8>::new());
+        assert_eq!(channel.receive_response::<u32>().unwrap(), 42);
+
+        let bytes =
+            ResponsePacket::new(ProtocolErrorCode::DeserializeError as u64, vec![]).serialize();
+        let mut channel = Channel::new(bytes.as_slice(), Vec::<u8>::new());
+        assert!(matches!(
+            channel.receive_response::<()>(),
+            Err(IpcError::ProtocolError(ProtocolErrorCode::DeserializeError))
+        ));
+    }
+}

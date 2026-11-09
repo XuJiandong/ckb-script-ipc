@@ -15,7 +15,7 @@ impl Pipe {
     }
 
     pub fn readable(&self) -> bool {
-        self.id % 2 == 0
+        self.id.is_multiple_of(2)
     }
 
     pub fn writable(&self) -> bool {

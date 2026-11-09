@@ -257,12 +257,11 @@ impl CkbCrypto for CryptoServer {
 pub fn program_entry() -> i8 {
     drop(ckb_std::logger::init());
     let world = CryptoServer::new();
-    let err = run_server(world.server());
-
-    if err.is_ok() {
-        0
-    } else {
-        error!("Server failed: {:?}", err.unwrap_err());
-        1
+    match run_server(world.server()) {
+        Ok(()) => 0,
+        Err(err) => {
+            error!("Server failed: {:?}", err);
+            1
+        }
     }
 }
