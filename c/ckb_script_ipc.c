@@ -284,6 +284,10 @@ exit:
 }
 
 static void new_buf_reader(CSIReader reader, CSIReader* buf_reader) {
+    if (g_csi_context.iobuf_malloc == NULL) {
+        *buf_reader = reader;
+        return;
+    }
     CSIBuffer* buf = NULL;
     new_buffer(&buf);
     buf->rw.reader = reader;
@@ -293,6 +297,10 @@ static void new_buf_reader(CSIReader reader, CSIReader* buf_reader) {
 }
 
 static void new_buf_writer(const CSIWriter writer, CSIWriter* buf_writer) {
+    if (g_csi_context.iobuf_malloc == NULL) {
+        *buf_writer = writer;
+        return;
+    }
     CSIBuffer* buf = NULL;
     new_buffer(&buf);
     buf->rw.writer = writer;
@@ -621,6 +629,23 @@ exit:
 }
 
 void csi_free_channel(CSIChannel* ch) {
-    g_csi_context.iobuf_free(ch->reader.ctx);
-    g_csi_context.iobuf_free(ch->writer.ctx);
+    CSIReader reader = ch->reader;
+    CSIWriter writer = ch->writer;
+    if (reader.read == buf_read) {
+        CSIBuffer* buffer = reader.ctx;
+        reader = buffer->rw.reader;
+        g_csi_context.iobuf_free(buffer);
+    }
+    if (writer.write == buf_write) {
+        CSIBuffer* buffer = writer.ctx;
+        writer = buffer->rw.writer;
+        g_csi_context.iobuf_free(buffer);
+    }
+    if (reader.read == csi_read_pipe) {
+        ckb_close((uint64_t)reader.ctx);
+    }
+    if (writer.write == csi_write_pipe) {
+        ckb_close((uint64_t)writer.ctx);
+    }
+    *ch = (CSIChannel){0};
 }

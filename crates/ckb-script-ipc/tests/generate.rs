@@ -80,3 +80,40 @@ fn test_conditionally_compiled_method() {
         r#"{"Enabled":42}"#
     );
 }
+
+#[ckb_script_ipc::service]
+pub trait ConditionalAttributeService {
+    #[cfg_attr(all(), cfg(any()))]
+    fn disabled(value: UnavailableType) -> UnavailableType;
+
+    #[cfg_attr(all(), cfg_attr(all(), cfg(any())), deprecated)]
+    fn nested_disabled(value: UnavailableType) -> UnavailableType;
+
+    #[cfg_attr(any(), cfg(any()))]
+    #[cfg_attr(all(), track_caller)]
+    fn enabled(value: u32) -> u32;
+}
+
+struct ConditionalAttributeServer;
+
+impl ConditionalAttributeService for ConditionalAttributeServer {
+    fn enabled(&mut self, value: u32) -> u32 {
+        value + 1
+    }
+}
+
+#[test]
+fn test_cfg_attr_methods_and_dispatch() {
+    use ckb_script_ipc_common::ipc::Serve;
+
+    let request =
+        serde_json::from_str::<ConditionalAttributeServiceRequest>(r#"{"Enabled":{"value":41}}"#)
+            .unwrap();
+    let response = ConditionalAttributeServer.server().serve(request).unwrap();
+    let ConditionalAttributeServiceResponse::Enabled(value) = response;
+    assert_eq!(value, 42);
+    assert_eq!(
+        serde_json::to_string(&response).unwrap(),
+        r#"{"Enabled":42}"#
+    );
+}

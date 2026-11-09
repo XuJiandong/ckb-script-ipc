@@ -173,6 +173,12 @@ In theory, VLQ can represent integers of any length, but considering practical
 implementation, we need to set a boundary for easier code processing. Currently,
 we define the range of all VLQ from 0 to 2^64, including length, method_id, error_code.
 
+The Rust runtime limits each received payload to 2 MiB (`packet::MAX_PAYLOAD_SIZE`),
+excluding the header. `Channel` applies the same limit when sending requests and
+responses. Larger payloads return `IpcError::PayloadTooLarge`; allocation failures
+return `IpcError::AllocationFailed`. After rejecting an oversized incoming packet,
+discard the channel because its payload has not been consumed.
+
 
 ## FAQ
 Q: What types can be used in IPC methods?

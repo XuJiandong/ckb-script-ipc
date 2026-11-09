@@ -28,6 +28,8 @@ static int serve_call_back(const CSIRequestPacket* request, CSIResponsePacket* r
 int main() {
     // initialize the fixed memory allocator
     csi_init_payload(g_payload_buf, sizeof(g_payload_buf), 2);
+#ifndef TEST_UNBUFFERED
     csi_init_iobuf(g_io_buf, sizeof(g_io_buf), 2);
+#endif
     return csi_run_server(serve_call_back);
 }

@@ -38,7 +38,14 @@ build/examples/server: examples/server.c build/libckb_script_ipc.a
 	$(CC) $(CFLAGS) $(LDFLAGS) -o build/examples/server examples/server.c build/libckb_script_ipc.a
 
 tests: build/tests/client build/tests/server build/tests/regression build/tests/small_iobuf \
-       build/tests/header_only_iobuf build/tests/zero_blocks
+       build/tests/header_only_iobuf build/tests/zero_blocks \
+       build/tests/unbuffered_client build/tests/unbuffered_server
+
+build/tests/unbuffered_client: tests/client.c build/libckb_script_ipc.a | out
+	$(CC) $(CFLAGS) -DTEST_UNBUFFERED $(LDFLAGS) -o $@ $< build/libckb_script_ipc.a
+
+build/tests/unbuffered_server: tests/server.c build/libckb_script_ipc.a | out
+	$(CC) $(CFLAGS) -DTEST_UNBUFFERED $(LDFLAGS) -o $@ $< build/libckb_script_ipc.a
 
 build/tests/small_iobuf: CFLAGS += -DTEST_SMALL_IOBUF
 build/tests/header_only_iobuf: CFLAGS += -DTEST_HEADER_ONLY_IOBUF

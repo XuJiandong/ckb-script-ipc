@@ -2,7 +2,7 @@ use crate::io::{BufReader, BufWriter, Read, Write};
 use crate::{
     error::{IpcError, ProtocolErrorCode},
     ipc::Serve,
-    packet::{Packet, RequestPacket, ResponsePacket},
+    packet::{Packet, RequestPacket, ResponsePacket, MAX_PAYLOAD_SIZE},
 };
 use alloc::string::String;
 use alloc::vec;
@@ -141,6 +141,9 @@ impl<R: Read, W: Write> Channel<R, W> {
     }
     pub(crate) fn send_request<Req: Serialize>(&mut self, req: Req) -> Result<(), IpcError> {
         let serialized_req = to_vec(&req).map_err(|_| IpcError::SerializeError)?;
+        if serialized_req.len() > MAX_PAYLOAD_SIZE {
+            return Err(IpcError::PayloadTooLarge);
+        }
         let packet = RequestPacket::new(serialized_req);
         #[cfg(feature = "enable-logging")]
         log::info!("send request: {:?}", packet);
@@ -166,6 +169,9 @@ impl<R: Read, W: Write> Channel<R, W> {
     /// A `Result` indicating whether the request was successfully sent, or an `IpcError` if
     /// writing to the channel fails.
     pub fn send_json_request(&mut self, json: &str) -> Result<(), IpcError> {
+        if json.len() > MAX_PAYLOAD_SIZE {
+            return Err(IpcError::PayloadTooLarge);
+        }
         let packet = RequestPacket::new(json.as_bytes().to_vec());
         #[cfg(feature = "enable-logging")]
         log::info!("send request: {:?}", packet);
@@ -177,6 +183,9 @@ impl<R: Read, W: Write> Channel<R, W> {
     }
     pub(crate) fn send_response<Resp: Serialize>(&mut self, resp: Resp) -> Result<(), IpcError> {
         let serialized_resp = to_vec(&resp).map_err(|_| IpcError::SerializeError)?;
+        if serialized_resp.len() > MAX_PAYLOAD_SIZE {
+            return Err(IpcError::PayloadTooLarge);
+        }
         let packet = ResponsePacket::new(0, serialized_resp);
         #[cfg(feature = "enable-logging")]
         log::info!("send response: {:?}", packet);
@@ -282,6 +291,26 @@ mod tests {
             self.flush_count += 1;
             Ok(())
         }
+    }
+
+    #[test]
+    fn oversized_messages_are_rejected_before_writing() {
+        let mut channel = Channel::new(&[][..], ShortWriter::default());
+        let payload = "x".repeat(MAX_PAYLOAD_SIZE + 1);
+        assert!(matches!(
+            channel.send_request(&payload),
+            Err(IpcError::PayloadTooLarge)
+        ));
+        assert!(matches!(
+            channel.send_json_request(&payload),
+            Err(IpcError::PayloadTooLarge)
+        ));
+        assert!(matches!(
+            channel.send_response(&payload),
+            Err(IpcError::PayloadTooLarge)
+        ));
+        assert!(channel.writer.get_ref().bytes.is_empty());
+        assert_eq!(channel.writer.get_ref().flush_count, 0);
     }
 
     #[test]

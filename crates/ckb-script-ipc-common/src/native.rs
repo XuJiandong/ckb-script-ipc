@@ -70,44 +70,40 @@ impl<Mac: SupportMachine> Syscalls<Mac> for DebugSyscall {
         Ok(true)
     }
 }
-struct ReadSyscall {
-    pipe: Pipe,
+// Own the endpoints together so CLOSE releases the same pipes used by I/O.
+struct PipeSyscalls {
+    reader: Pipe,
+    writer: Pipe,
 }
 
-impl ReadSyscall {
-    pub fn new(pipe: Pipe) -> Self {
-        Self { pipe }
-    }
-}
-
-impl<Mac: SupportMachine> Syscalls<Mac> for ReadSyscall {
-    fn initialize(&mut self, _machine: &mut Mac) -> Result<(), ckb_vm::error::Error> {
-        Ok(())
+impl PipeSyscalls {
+    fn new(reader: Pipe, writer: Pipe) -> Self {
+        Self { reader, writer }
     }
 
-    fn ecall(&mut self, machine: &mut Mac) -> Result<bool, ckb_vm::error::Error> {
-        let code = &machine.registers()[A7];
-        if code.to_i32() != READ {
-            return Ok(false);
-        }
+    fn read<Mac: SupportMachine>(
+        &mut self,
+        machine: &mut Mac,
+    ) -> Result<bool, ckb_vm::error::Error> {
         let fd = machine.registers()[A0].to_u64();
-        if fd != FIRST_FD_SLOT {
-            return Err(ckb_vm::error::Error::IO {
-                kind: std::io::ErrorKind::Other,
-                data: "can only read on pipe 2".into(),
-            });
+        if fd != FIRST_FD_SLOT || self.reader.rx.is_none() {
+            machine.set_register(A0, Mac::REG::from_u8(6));
+            return Ok(true);
         }
         let buffer_addr = machine.registers()[A1].clone();
         let length_addr = machine.registers()[A2].clone();
-        let length = machine.memory_mut().load64(&length_addr)?.to_u64() as usize;
-        let mut buf = vec![0; length];
-        let real_len = self
-            .pipe
-            .read(&mut buf)
-            .map_err(|_| ckb_vm::error::Error::IO {
-                kind: std::io::ErrorKind::Other,
-                data: "READ error".into(),
-            })?;
+        let length = machine.memory_mut().load64(&length_addr)?.to_u64();
+        // A read may return fewer bytes than requested. Never allocate based on
+        // a guest-supplied capacity, which can exceed the guest address space.
+        let mut buf = [0u8; 8192];
+        let capacity = length.min(buf.len() as u64) as usize;
+        let real_len =
+            self.reader
+                .read(&mut buf[..capacity])
+                .map_err(|_| ckb_vm::error::Error::IO {
+                    kind: std::io::ErrorKind::Other,
+                    data: "READ error".into(),
+                })?;
         machine
             .memory_mut()
             .store_bytes(buffer_addr.to_u64(), &buf[..real_len])?;
@@ -120,34 +116,15 @@ impl<Mac: SupportMachine> Syscalls<Mac> for ReadSyscall {
         machine.set_register(A0, Mac::REG::from_u8(0));
         Ok(true)
     }
-}
 
-struct WriteSyscall {
-    pipe: Pipe,
-}
-
-impl WriteSyscall {
-    pub fn new(pipe: Pipe) -> Self {
-        Self { pipe }
-    }
-}
-
-impl<Mac: SupportMachine> Syscalls<Mac> for WriteSyscall {
-    fn initialize(&mut self, _machine: &mut Mac) -> Result<(), ckb_vm::error::Error> {
-        Ok(())
-    }
-
-    fn ecall(&mut self, machine: &mut Mac) -> Result<bool, ckb_vm::error::Error> {
-        let code = &machine.registers()[A7];
-        if code.to_i32() != WRITE {
-            return Ok(false);
-        }
+    fn write<Mac: SupportMachine>(
+        &mut self,
+        machine: &mut Mac,
+    ) -> Result<bool, ckb_vm::error::Error> {
         let fd = machine.registers()[A0].to_u64();
-        if fd != (FIRST_FD_SLOT + 1) {
-            return Err(ckb_vm::error::Error::IO {
-                kind: std::io::ErrorKind::Other,
-                data: "can only write on pipe 3".into(),
-            });
+        if fd != FIRST_FD_SLOT + 1 || self.writer.tx.is_none() {
+            machine.set_register(A0, Mac::REG::from_u8(6));
+            return Ok(true);
         }
         let buffer_addr = machine.registers()[A1].clone();
         let length_addr = machine.registers()[A2].clone();
@@ -163,7 +140,7 @@ impl<Mac: SupportMachine> Syscalls<Mac> for WriteSyscall {
             .memory_mut()
             .load_bytes(buffer_addr.to_u64(), length)?;
         // the pipe write can't write partial data so we don't need to check result length.
-        self.pipe
+        self.writer
             .write(&bytes)
             .map_err(|_| ckb_vm::error::Error::IO {
                 kind: std::io::ErrorKind::Other,
@@ -178,6 +155,35 @@ impl<Mac: SupportMachine> Syscalls<Mac> for WriteSyscall {
         machine.add_cycles_no_checking(SPAWN_YIELD_CYCLES_BASE)?;
         machine.set_register(A0, Mac::REG::from_u8(0));
         Ok(true)
+    }
+}
+
+impl<Mac: SupportMachine> Syscalls<Mac> for PipeSyscalls {
+    fn initialize(&mut self, _machine: &mut Mac) -> Result<(), ckb_vm::error::Error> {
+        Ok(())
+    }
+
+    fn ecall(&mut self, machine: &mut Mac) -> Result<bool, ckb_vm::error::Error> {
+        match machine.registers()[A7].to_i32() {
+            READ => self.read(machine),
+            WRITE => self.write(machine),
+            CLOSE => {
+                let fd = machine.registers()[A0].to_u64();
+                let result = if fd == FIRST_FD_SLOT && self.reader.rx.is_some() {
+                    self.reader.close();
+                    0
+                } else if fd == FIRST_FD_SLOT + 1 && self.writer.tx.is_some() {
+                    self.writer.close();
+                    0
+                } else {
+                    6 // INVALID_FD
+                };
+                machine.add_cycles_no_checking(SPAWN_YIELD_CYCLES_BASE)?;
+                machine.set_register(A0, Mac::REG::from_u8(result));
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
     }
 }
 
@@ -215,23 +221,6 @@ impl<Mac: SupportMachine> Syscalls<Mac> for InheritedFdSyscall {
 
         machine.set_register(A0, Mac::REG::from_u8(0));
         machine.add_cycles_no_checking(SPAWN_YIELD_CYCLES_BASE)?;
-        Ok(true)
-    }
-}
-
-struct CloseSyscall {}
-
-impl<Mac: SupportMachine> Syscalls<Mac> for CloseSyscall {
-    fn initialize(&mut self, _machine: &mut Mac) -> Result<(), ckb_vm::error::Error> {
-        Ok(())
-    }
-
-    fn ecall(&mut self, machine: &mut Mac) -> Result<bool, ckb_vm::error::Error> {
-        let code = &machine.registers()[A7];
-        if code.to_i32() != CLOSE {
-            return Ok(false);
-        }
-        machine.set_register(A0, Mac::REG::from_u8(0));
         Ok(true)
     }
 }
@@ -298,6 +287,7 @@ impl Pipe {
         )
     }
     pub fn close(&mut self) {
+        self.buf.clear();
         if self.tx.is_some() {
             drop(self.tx.take());
         }
@@ -309,8 +299,15 @@ impl Pipe {
 
 impl Read for Pipe {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+        let rx = self
+            .rx
+            .as_ref()
+            .ok_or_else(|| Error::new(ErrorKind::Other, "invalid read pipe"))?;
+        if buf.is_empty() {
+            return Ok(0);
+        }
         if self.buf.is_empty() {
-            match self.rx.as_ref().unwrap().lock().unwrap().recv() {
+            match rx.lock().unwrap().recv() {
                 Ok(data) => self.buf = data,
                 Err(_) => {
                     #[cfg(feature = "enable-logging")]
@@ -331,11 +328,15 @@ impl Read for Pipe {
 
 impl Write for Pipe {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Error> {
+        let tx = self
+            .tx
+            .as_ref()
+            .ok_or_else(|| Error::new(ErrorKind::Other, "invalid write pipe"))?;
         // short-circuit zero-length writes
         if buf.is_empty() {
             return Ok(0);
         }
-        match self.tx.as_mut().unwrap().send(buf.to_vec()) {
+        match tx.send(buf.to_vec()) {
             Ok(_) => {
                 #[cfg(feature = "enable-logging")]
                 log::info!("Pipe Write: write {} bytes", buf.len());
@@ -370,10 +371,8 @@ fn ckb_vm_entry(
     let core = ckb_vm::DefaultMachineBuilder::new(asm_core)
         .instruction_cycle_func(Box::new(estimate_cycles))
         .syscall(Box::new(DebugSyscall {}))
-        .syscall(Box::new(ReadSyscall::new(read_pipe)))
-        .syscall(Box::new(WriteSyscall::new(write_pipe)))
+        .syscall(Box::new(PipeSyscalls::new(read_pipe, write_pipe)))
         .syscall(Box::new(InheritedFdSyscall {}))
-        .syscall(Box::new(CloseSyscall {}))
         .syscall(Box::new(DebugSyscall {}))
         .build();
     let mut machine = ckb_vm::machine::asm::AsmMachine::new(core);
@@ -401,10 +400,8 @@ fn ckb_vm_entry(
     let mut machine = machine_builder
         .instruction_cycle_func(Box::new(estimate_cycles))
         .syscall(Box::new(DebugSyscall {}))
-        .syscall(Box::new(ReadSyscall::new(read_pipe)))
-        .syscall(Box::new(WriteSyscall::new(write_pipe)))
+        .syscall(Box::new(PipeSyscalls::new(read_pipe, write_pipe)))
         .syscall(Box::new(InheritedFdSyscall {}))
-        .syscall(Box::new(CloseSyscall {}))
         .build();
     let args_iter = args.into_iter().map(Ok);
     machine.load_program(&code, args_iter)?;
@@ -469,4 +466,79 @@ pub fn spawn_server(
         let _ = ckb_vm_entry(code, args, read_pipe2, write_pipe1);
     });
     Ok((read_pipe1, write_pipe2))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ckb_vm::{CoreMachine, DefaultCoreMachine, SparseMemory};
+    use std::sync::mpsc::{TryRecvError, TrySendError};
+
+    fn machine() -> DefaultCoreMachine<u64, SparseMemory<u64>> {
+        DefaultCoreMachine::new(ckb_vm::ISA_IMC, ckb_vm::machine::VERSION2, u64::MAX)
+    }
+
+    #[test]
+    fn oversized_read_capacity_only_copies_available_data() {
+        let (reader, _host_writer) = Pipe::new_pair();
+        let (_host_reader, writer) = Pipe::new_pair();
+        let mut syscalls = PipeSyscalls::new(reader, writer);
+        syscalls.reader.buf = vec![1, 2, 3];
+        let mut machine = machine();
+        machine.memory_mut().store64(&0, &u64::MAX).unwrap();
+        machine.set_register(A7, READ as u64);
+        machine.set_register(A0, FIRST_FD_SLOT);
+        machine.set_register(A1, 8);
+        machine.set_register(A2, 0);
+        assert!(syscalls.ecall(&mut machine).unwrap());
+        assert_eq!(machine.registers()[A0], 0);
+        assert_eq!(machine.memory_mut().load64(&0).unwrap(), 3);
+        assert_eq!(
+            &machine.memory_mut().load_bytes(8, 3).unwrap()[..],
+            &[1, 2, 3]
+        );
+    }
+
+    #[test]
+    fn close_disconnects_each_endpoint_and_rejects_reuse() {
+        let (reader, host_writer) = Pipe::new_pair();
+        let (host_reader, writer) = Pipe::new_pair();
+        let mut syscalls = PipeSyscalls::new(reader, writer);
+        let mut machine = machine();
+        machine.set_register(A7, CLOSE as u64);
+        machine.set_register(A0, FIRST_FD_SLOT + 1);
+        syscalls.ecall(&mut machine).unwrap();
+        assert_eq!(machine.registers()[A0], 0);
+        assert!(matches!(
+            host_reader.rx.as_ref().unwrap().lock().unwrap().try_recv(),
+            Err(TryRecvError::Disconnected)
+        ));
+        machine.set_register(A0, FIRST_FD_SLOT);
+        syscalls.ecall(&mut machine).unwrap();
+        assert_eq!(machine.registers()[A0], 0);
+        assert!(matches!(
+            host_writer.tx.as_ref().unwrap().try_send(vec![1]),
+            Err(TrySendError::Disconnected(_))
+        ));
+        for (call, fd) in [
+            (CLOSE, FIRST_FD_SLOT),
+            (CLOSE, FIRST_FD_SLOT + 1),
+            (CLOSE, 42),
+            (READ, FIRST_FD_SLOT),
+            (WRITE, FIRST_FD_SLOT + 1),
+        ] {
+            machine.set_register(A7, call as u64);
+            machine.set_register(A0, fd);
+            syscalls.ecall(&mut machine).unwrap();
+            assert_eq!(machine.registers()[A0], 6);
+        }
+    }
+
+    #[test]
+    fn empty_read_does_not_wait_for_a_writer() {
+        let (mut reader, _writer) = Pipe::new_pair();
+        assert_eq!(reader.read(&mut []).unwrap(), 0);
+        reader.close();
+        assert!(reader.read(&mut [0]).is_err());
+    }
 }

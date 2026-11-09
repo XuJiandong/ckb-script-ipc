@@ -77,6 +77,37 @@ static void custom_free(void* ptr) {
     REQUIRE(false);
 }
 
+static void test_channel_closes_pipes(bool buffered) {
+    if (buffered) {
+        csi_init_malloc(custom_malloc, custom_free);
+    }
+    // More than the VM's descriptor limit over time, but only four live at once.
+    for (size_t i = 0; i < 40; i++) {
+        uint64_t input[2], output[2];
+        REQUIRE(ckb_pipe(input) == 0);
+        REQUIRE(ckb_pipe(output) == 0);
+        CSIReader reader;
+        CSIWriter writer;
+        REQUIRE(new_pipe_reader(input[0], &reader) == 0);
+        REQUIRE(new_pipe_writer(output[1], &writer) == 0);
+        CSIChannel channel = {0};
+        new_buf_reader(reader, &channel.reader);
+        new_buf_writer(writer, &channel.writer);
+        csi_free_channel(&channel);
+        csi_free_channel(&channel);
+        REQUIRE(ckb_close(input[0]) == CKB_INVALID_FD);
+        REQUIRE(ckb_close(output[1]) == CKB_INVALID_FD);
+        uint8_t byte;
+        size_t len = 1;
+        REQUIRE(ckb_read(output[0], &byte, &len) == CKB_OTHER_END_CLOSED);
+        REQUIRE(ckb_close(input[1]) == 0);
+        REQUIRE(ckb_close(output[0]) == 0);
+    }
+    if (buffered) {
+        REQUIRE(custom_allocations == custom_frees);
+    }
+}
+
 static void test_custom_allocator_and_empty_response(void) {
     custom_allocations = 0;
     custom_frees = 0;
@@ -250,6 +281,8 @@ int main(void) {
     csi_init_iobuf(io_storage, sizeof(io_storage), 0);
     return 1;
 #else
+    test_channel_closes_pipes(false);
+    test_channel_closes_pipes(true);
     test_custom_allocator_and_empty_response();
     test_fixed_allocator();
     test_read_errors();

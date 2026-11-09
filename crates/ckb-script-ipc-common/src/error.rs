@@ -24,6 +24,8 @@ pub enum IpcError {
     ReadExactError,
     BufReaderError,
     GeneralIoError,
+    PayloadTooLarge,
+    AllocationFailed,
     ProtocolError(ProtocolErrorCode),
 }
 
@@ -121,6 +123,8 @@ impl From<IpcError> for ProtocolErrorCode {
             | IpcError::ReadUntilError
             | IpcError::ReadExactError => ProtocolErrorCode::GeneralIoError,
             IpcError::GeneralIoError => ProtocolErrorCode::GeneralIoError,
+            IpcError::PayloadTooLarge => ProtocolErrorCode::LengthNotEnough,
+            IpcError::AllocationFailed => ProtocolErrorCode::GeneralIoError,
             IpcError::ProtocolError(e) => e,
         }
     }

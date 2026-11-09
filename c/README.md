@@ -156,6 +156,7 @@ However, if your application requires handling multiple concurrent requests or n
 
 ## IO Buffer Memory Allocation
 Unbuffered I/O operations trigger frequent `read` and `write` system calls, which can become a performance bottleneck in high-throughput scenarios.
+Channels use unbuffered I/O when only `csi_init_payload` has been called.
 To optimize I/O performance, you can enable buffering by providing a pre-allocated buffer:
 ```c
 static uint8_t g_io_buf[2048];
@@ -165,3 +166,8 @@ csi_init_iobuf(g_io_buf, sizeof(g_io_buf), 2);
 ```
 
 How to choose `block_count`? Each channel requires one block for request payloads and one block for response payloads, so the total number of blocks should be at least `2 * number_of_concurrent_channels`. Normally, a value of 2 (one channel) is sufficient.
+
+Call `csi_free_channel(&channel)` when a client is finished. It closes both pipe
+descriptors, releases any I/O buffers, and clears the channel. This also allows
+the server to observe disconnection. Custom reader/writer contexts must be
+released by their owner.

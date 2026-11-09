@@ -129,23 +129,43 @@ impl Parse for IpcMethod {
     }
 }
 
-fn collect_cfg_attrs(ipcs: &[IpcMethod]) -> Vec<Vec<&Attribute>> {
+// Keep only conditional exclusion attributes: other cfg_attr branches can
+// contain method-only attributes that are invalid on variants or match arms.
+fn conditional_meta(meta: &syn::Meta) -> Option<syn::Meta> {
+    if meta.path().is_ident("cfg") {
+        return Some(meta.clone());
+    }
+    if let syn::Meta::List(list) = meta {
+        if list.path.is_ident("cfg_attr") {
+            let args = list
+                .parse_args_with(syn::punctuated::Punctuated::<syn::Meta, Comma>::parse_terminated)
+                .ok()?;
+            let mut args = args.iter();
+            let predicate = args.next()?;
+            let conditions: Vec<_> = args.filter_map(conditional_meta).collect();
+            if !conditions.is_empty() {
+                return Some(parse_quote!(cfg_attr(#predicate, #( #conditions ),*)));
+            }
+        }
+    }
+    None
+}
+
+fn collect_cfg_attrs(ipcs: &[IpcMethod]) -> Vec<Vec<Attribute>> {
     ipcs.iter()
         .map(|ipc| {
             ipc.attrs
                 .iter()
-                .filter(|att| {
-                    matches!(att.style, AttrStyle::Outer)
-                        && match &att.meta {
-                            syn::Meta::List(syn::MetaList { path, .. }) => {
-                                path.get_ident() == Some(&Ident::new("cfg", ipc.ident.span()))
-                            }
-                            _ => false,
-                        }
+                .filter(|att| matches!(att.style, AttrStyle::Outer))
+                .filter_map(|att| {
+                    conditional_meta(&att.meta).map(|meta| Attribute {
+                        meta,
+                        ..att.clone()
+                    })
                 })
-                .collect::<Vec<_>>()
+                .collect()
         })
-        .collect::<Vec<_>>()
+        .collect()
 }
 
 #[proc_macro_attribute]
@@ -228,7 +248,7 @@ struct ServiceGenerator<'a> {
     method_idents: &'a [&'a Ident],
     request_names: &'a [String],
     method_attrs: &'a [&'a [Attribute]],
-    method_cfgs: &'a [Vec<&'a Attribute>],
+    method_cfgs: &'a [Vec<Attribute>],
     args: &'a [&'a [PatType]],
     return_types: &'a [&'a Type],
     arg_pats: &'a [Vec<&'a Pat>],

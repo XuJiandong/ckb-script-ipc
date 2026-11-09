@@ -7,6 +7,25 @@ use crate::error::IpcError;
 use crate::io::Read;
 use crate::vlq::{vlq_decode, vlq_encode};
 
+/// Maximum accepted payload size (2 MiB), excluding the packet header.
+pub const MAX_PAYLOAD_SIZE: usize = 2 * 1024 * 1024;
+
+fn read_payload(reader: &mut impl Read, length: u64) -> Result<Vec<u8>, IpcError> {
+    if length > MAX_PAYLOAD_SIZE as u64 {
+        return Err(IpcError::PayloadTooLarge);
+    }
+    let length = length as usize;
+    let mut payload = Vec::new();
+    payload
+        .try_reserve_exact(length)
+        .map_err(|_| IpcError::AllocationFailed)?;
+    payload.resize(length, 0);
+    reader
+        .read_exact(&mut payload)
+        .map_err(|_| IpcError::ReadExactError)?;
+    Ok(payload)
+}
+
 /// The `Packet` trait defines the interface for handling packets in an IPC context.
 /// Types implementing this trait can be used to represent and manipulate packets.
 ///
@@ -53,10 +72,7 @@ impl Packet for RequestPacket {
         let version = read_next_vlq(reader)? as u8;
         let method_id = read_next_vlq(reader)?;
         let payload_length = read_next_vlq(reader)?;
-        let mut payload = vec![0u8; payload_length as usize];
-        reader
-            .read_exact(&mut payload[..])
-            .map_err(|_| IpcError::ReadExactError)?;
+        let payload = read_payload(reader, payload_length)?;
         Ok(RequestPacket {
             version,
             method_id,
@@ -115,10 +131,7 @@ impl Packet for ResponsePacket {
         let version = read_next_vlq(reader)? as u8;
         let error_code = read_next_vlq(reader)?;
         let payload_length = read_next_vlq(reader)?;
-        let mut payload = vec![0u8; payload_length as usize];
-        reader
-            .read_exact(&mut payload[..])
-            .map_err(|_| IpcError::ReadExactError)?;
+        let payload = read_payload(reader, payload_length)?;
         Ok(ResponsePacket {
             version,
             error_code,
@@ -167,6 +180,50 @@ pub fn read_next_vlq(reader: &mut impl Read) -> Result<u64, IpcError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn oversized_packets_are_rejected_before_reading_the_payload() {
+        for length in [MAX_PAYLOAD_SIZE as u64 + 1, u64::MAX] {
+            let mut bytes = vec![0, 0];
+            bytes.extend_from_slice(&vlq_encode(length));
+            bytes.push(42);
+            let mut reader = bytes.as_slice();
+            assert!(matches!(
+                RequestPacket::read_from(&mut reader),
+                Err(IpcError::PayloadTooLarge)
+            ));
+            assert_eq!(reader, &[42]);
+            let mut reader = bytes.as_slice();
+            assert!(matches!(
+                ResponsePacket::read_from(&mut reader),
+                Err(IpcError::PayloadTooLarge)
+            ));
+            assert_eq!(reader, &[42]);
+        }
+    }
+
+    #[test]
+    fn payload_limit_is_inclusive_and_truncation_is_an_error() {
+        let payload = vec![42; MAX_PAYLOAD_SIZE];
+        let packet = RequestPacket::new(payload.clone()).serialize();
+        assert_eq!(
+            RequestPacket::read_from(&mut packet.as_slice())
+                .unwrap()
+                .payload(),
+            payload
+        );
+        let packet = ResponsePacket::new(0, payload.clone()).serialize();
+        assert_eq!(
+            ResponsePacket::read_from(&mut packet.as_slice())
+                .unwrap()
+                .payload(),
+            payload
+        );
+        assert!(matches!(
+            RequestPacket::read_from(&mut &[0, 0, 2, 42][..]),
+            Err(IpcError::ReadExactError)
+        ));
+    }
 
     #[test]
     fn test_read_next_vlq_stops_after_ten_continuation_bytes() {
