@@ -72,6 +72,22 @@ fn test_c_impl_tests() {
 }
 
 #[test]
+fn test_c_impl_unbuffered() {
+    test_c_impl(
+        "../../c/build/tests/unbuffered_client",
+        "../../c/build/tests/server",
+    );
+    test_c_impl(
+        "../../c/build/tests/client",
+        "../../c/build/tests/unbuffered_server",
+    );
+    test_c_impl(
+        "../../c/build/tests/unbuffered_client",
+        "../../c/build/tests/unbuffered_server",
+    );
+}
+
+#[test]
 fn test_c_impl_regressions() {
     test_c_impl(
         "../../c/build/tests/regression",

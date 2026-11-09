@@ -7,6 +7,25 @@ use crate::error::IpcError;
 use crate::io::Read;
 use crate::vlq::{vlq_decode, vlq_encode};
 
+/// Maximum accepted payload size (2 MiB), excluding the packet header.
+pub const MAX_PAYLOAD_SIZE: usize = 2 * 1024 * 1024;
+
+fn read_payload(reader: &mut impl Read, length: u64) -> Result<Vec<u8>, IpcError> {
+    if length > MAX_PAYLOAD_SIZE as u64 {
+        return Err(IpcError::PayloadTooLarge);
+    }
+    let length = length as usize;
+    let mut payload = Vec::new();
+    payload
+        .try_reserve_exact(length)
+        .map_err(|_| IpcError::AllocationFailed)?;
+    payload.resize(length, 0);
+    reader
+        .read_exact(&mut payload)
+        .map_err(|_| IpcError::ReadExactError)?;
+    Ok(payload)
+}
+
 /// The `Packet` trait defines the interface for handling packets in an IPC context.
 /// Types implementing this trait can be used to represent and manipulate packets.
 ///
@@ -53,10 +72,7 @@ impl Packet for RequestPacket {
         let version = read_next_vlq(reader)? as u8;
         let method_id = read_next_vlq(reader)?;
         let payload_length = read_next_vlq(reader)?;
-        let mut payload = vec![0u8; payload_length as usize];
-        reader
-            .read_exact(&mut payload[..])
-            .map_err(|_| IpcError::ReadExactError)?;
+        let payload = read_payload(reader, payload_length)?;
         Ok(RequestPacket {
             version,
             method_id,
@@ -115,10 +131,7 @@ impl Packet for ResponsePacket {
         let version = read_next_vlq(reader)? as u8;
         let error_code = read_next_vlq(reader)?;
         let payload_length = read_next_vlq(reader)?;
-        let mut payload = vec![0u8; payload_length as usize];
-        reader
-            .read_exact(&mut payload[..])
-            .map_err(|_| IpcError::ReadExactError)?;
+        let payload = read_payload(reader, payload_length)?;
         Ok(ResponsePacket {
             version,
             error_code,
@@ -149,17 +162,127 @@ impl ResponsePacket {
 }
 
 pub fn read_next_vlq(reader: &mut impl Read) -> Result<u64, IpcError> {
-    let mut peek = [0u8; 1];
-    let mut buf = vec![];
-    loop {
-        let n = reader.read(&mut peek).map_err(|_| IpcError::ReadVlqError)?;
+    let mut buf = [0u8; 10];
+    for i in 0..buf.len() {
+        let n = reader
+            .read(&mut buf[i..i + 1])
+            .map_err(|_| IpcError::ReadVlqError)?;
         if n == 0 {
-            break;
+            return Err(IpcError::IncompleteVlqSeq);
         }
-        buf.push(peek[0]);
-        if peek[0] & 0x80 == 0 {
-            break;
+        if buf[i] & 0x80 == 0 {
+            return vlq_decode(&buf[..i + 1]);
         }
     }
-    vlq_decode(&buf)
+    Err(IpcError::DecodeVlqOverflow)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn oversized_packets_are_rejected_before_reading_the_payload() {
+        for length in [MAX_PAYLOAD_SIZE as u64 + 1, u64::MAX] {
+            let mut bytes = vec![0, 0];
+            bytes.extend_from_slice(&vlq_encode(length));
+            bytes.push(42);
+            let mut reader = bytes.as_slice();
+            assert!(matches!(
+                RequestPacket::read_from(&mut reader),
+                Err(IpcError::PayloadTooLarge)
+            ));
+            assert_eq!(reader, &[42]);
+            let mut reader = bytes.as_slice();
+            assert!(matches!(
+                ResponsePacket::read_from(&mut reader),
+                Err(IpcError::PayloadTooLarge)
+            ));
+            assert_eq!(reader, &[42]);
+        }
+    }
+
+    #[test]
+    fn payload_limit_is_inclusive_and_truncation_is_an_error() {
+        let payload = vec![42; MAX_PAYLOAD_SIZE];
+        let packet = RequestPacket::new(payload.clone()).serialize();
+        assert_eq!(
+            RequestPacket::read_from(&mut packet.as_slice())
+                .unwrap()
+                .payload(),
+            payload
+        );
+        let packet = ResponsePacket::new(0, payload.clone()).serialize();
+        assert_eq!(
+            ResponsePacket::read_from(&mut packet.as_slice())
+                .unwrap()
+                .payload(),
+            payload
+        );
+        assert!(matches!(
+            RequestPacket::read_from(&mut &[0, 0, 2, 42][..]),
+            Err(IpcError::ReadExactError)
+        ));
+    }
+
+    #[test]
+    fn test_read_next_vlq_stops_after_ten_continuation_bytes() {
+        struct ContinuationReader(usize);
+
+        impl Read for ContinuationReader {
+            fn read(&mut self, buf: &mut [u8]) -> Result<usize, crate::io::Error> {
+                assert!(self.0 < 10, "must not read an eleventh byte");
+                self.0 += 1;
+                buf[0] = 0x80;
+                Ok(1)
+            }
+        }
+
+        let mut reader = ContinuationReader(0);
+        assert!(matches!(
+            read_next_vlq(&mut reader),
+            Err(IpcError::DecodeVlqOverflow)
+        ));
+        assert_eq!(reader.0, 10);
+    }
+
+    #[test]
+    fn test_read_next_vlq_tenth_byte_boundaries() {
+        for terminal in 0..=u8::MAX {
+            let mut bytes = [0x80; 11];
+            bytes[9] = terminal;
+            bytes[10] = 42;
+            let mut reader = bytes.as_slice();
+            let result = read_next_vlq(&mut reader);
+            match terminal {
+                0 => assert_eq!(result.unwrap(), 0),
+                1 => assert_eq!(result.unwrap(), 1u64 << 63),
+                _ => assert!(matches!(result, Err(IpcError::DecodeVlqOverflow))),
+            }
+            assert_eq!(reader, &[42]);
+        }
+    }
+
+    #[test]
+    fn test_read_next_vlq_valid_values() {
+        for value in [0, 127, 128, 16384, u64::MAX / 2, 1u64 << 63, u64::MAX] {
+            let mut bytes = vlq_encode(value);
+            bytes.push(42);
+            let mut reader = bytes.as_slice();
+            assert_eq!(read_next_vlq(&mut reader).unwrap(), value);
+            assert_eq!(reader, &[42]);
+        }
+    }
+
+    #[test]
+    fn test_read_next_vlq_incomplete_sequence() {
+        let bytes = [0x80; 9];
+        for len in 0..=bytes.len() {
+            let mut reader = &bytes[..len];
+            assert!(matches!(
+                read_next_vlq(&mut reader),
+                Err(IpcError::IncompleteVlqSeq)
+            ));
+        }
+    }
 }

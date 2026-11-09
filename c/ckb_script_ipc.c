@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
 #include "ckb_syscall_apis.h"
 #include "ckb_consts.h"
 #include "ckb_script_ipc.h"
@@ -227,6 +228,10 @@ static int buf_read(void* ctx, void* buf, size_t len, size_t* read_len) {
         err = reader.read(reader.ctx, buffer->buf, buffer->max_len, &buffer->filled_len);
         CHECK(err);
         buffer->pos = 0;
+        if (buffer->filled_len == 0) {
+            *read_len = 0;
+            return 0;
+        }
     }
     if (buffer->pos >= buffer->filled_len || buffer->filled_len > buffer->max_len) {
         PANIC(CSI_ERROR_INTERNAL);
@@ -279,6 +284,10 @@ exit:
 }
 
 static void new_buf_reader(CSIReader reader, CSIReader* buf_reader) {
+    if (g_csi_context.iobuf_malloc == NULL) {
+        *buf_reader = reader;
+        return;
+    }
     CSIBuffer* buf = NULL;
     new_buffer(&buf);
     buf->rw.reader = reader;
@@ -288,6 +297,10 @@ static void new_buf_reader(CSIReader reader, CSIReader* buf_reader) {
 }
 
 static void new_buf_writer(const CSIWriter writer, CSIWriter* buf_writer) {
+    if (g_csi_context.iobuf_malloc == NULL) {
+        *buf_writer = writer;
+        return;
+    }
     CSIBuffer* buf = NULL;
     new_buffer(&buf);
     buf->rw.writer = writer;
@@ -298,12 +311,15 @@ static void new_buf_writer(const CSIWriter writer, CSIWriter* buf_writer) {
 }
 
 int csi_read_exact(CSIReader* reader, void* buf, size_t len) {
-    int remaining_len = len;
+    size_t remaining_len = len;
     while (remaining_len > 0) {
         size_t read_len = 0;
         int err = reader->read(reader->ctx, buf, remaining_len, &read_len);
         if (err) {
             return err;
+        }
+        if (read_len == 0) {
+            return CSI_ERROR_UNEXPECTED_EOF;
         }
         remaining_len -= read_len;
         buf += read_len;
@@ -502,7 +518,7 @@ int csi_call(CSIChannel* channel, const CSIRequestPacket* request, CSIResponsePa
     CHECK(err);
     err = csi_receive_response(channel, response);
     CHECK(err);
-    err = response->error_code;
+    err = response->error_code > INT_MAX ? CSI_ERROR_INTERNAL : (int)response->error_code;
 exit:
     return err;
 }
@@ -613,6 +629,23 @@ exit:
 }
 
 void csi_free_channel(CSIChannel* ch) {
-    g_csi_context.iobuf_free(ch->reader.ctx);
-    g_csi_context.iobuf_free(ch->writer.ctx);
+    CSIReader reader = ch->reader;
+    CSIWriter writer = ch->writer;
+    if (reader.read == buf_read) {
+        CSIBuffer* buffer = reader.ctx;
+        reader = buffer->rw.reader;
+        g_csi_context.iobuf_free(buffer);
+    }
+    if (writer.write == buf_write) {
+        CSIBuffer* buffer = writer.ctx;
+        writer = buffer->rw.writer;
+        g_csi_context.iobuf_free(buffer);
+    }
+    if (reader.read == csi_read_pipe) {
+        ckb_close((uint64_t)reader.ctx);
+    }
+    if (writer.write == csi_write_pipe) {
+        ckb_close((uint64_t)writer.ctx);
+    }
+    *ch = (CSIChannel){0};
 }

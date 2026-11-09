@@ -28,6 +28,7 @@ typedef enum CSIErrorCode {
     CSI_ERROR_FA_TOO_MANY_BLOCK,
     CSI_ERROR_FA_NOT_ALIGNED,
     CSI_ERROR_FA_INVALID_BLOCK_COUNT,
+    CSI_ERROR_UNEXPECTED_EOF,
 } CSIErrorCode;
 
 typedef void* (*CSIMalloc)(size_t len);
@@ -50,6 +51,7 @@ void csi_init_payload(void* buf, size_t len, size_t block_count);
  * Initialize an I/O buffer to optimize read and write operations.
  * This is an optional optimization that can reduce the number of system calls
  * when performing frequent I/O operations.
+ * Without this call or csi_init_malloc(), channels use unbuffered pipe I/O.
  *
  * @param buf Pointer to the pre-allocated memory buffer for I/O operations
  * @param len Size of the pre-allocated buffer in bytes
@@ -145,6 +147,8 @@ typedef struct CSIChannel {
  * @param request: The request packet to send
  * @param response: Pointer to store the received response packet
  * @return 0 for success, non-zero for failure
+ *         Response error codes greater than INT_MAX return CSI_ERROR_INTERNAL;
+ *         the original code is preserved in response->error_code.
  *
  * Note: The caller is responsible for:
  * - Freeing the response's payload using csi_free_response() when it's no longer needed
@@ -177,7 +181,9 @@ int csi_spawn_cell_server(void* code_hash, uint64_t hash_type, const char* argv[
 /**
  * Frees the resources associated with a CSIChannel.
  *
- * This function releases the internal buffers and resources used by the channel.
+ * This function closes library-owned pipe descriptors and releases internal buffers.
+ * It resets the channel to zero and is safe to call again on that cleared channel.
+ * Custom reader/writer contexts remain the caller's responsibility.
  *
  * @param ch: Pointer to the channel to be freed. Must not be NULL.
  *

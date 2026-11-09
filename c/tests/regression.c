@@ -15,6 +15,7 @@ typedef struct Input {
     size_t len;
     size_t pos;
     int error;
+    size_t max_read;
 } Input;
 
 static int read_input(void* ctx, void* buf, size_t len, size_t* read_len) {
@@ -25,6 +26,9 @@ static int read_input(void* ctx, void* buf, size_t len, size_t* read_len) {
     }
     size_t available = input->len - input->pos;
     *read_len = len < available ? len : available;
+    if (input->max_read != 0 && *read_len > input->max_read) {
+        *read_len = input->max_read;
+    }
     memcpy(buf, input->data + input->pos, *read_len);
     input->pos += *read_len;
     return 0;
@@ -71,6 +75,37 @@ static void custom_free(void* ptr) {
         }
     }
     REQUIRE(false);
+}
+
+static void test_channel_closes_pipes(bool buffered) {
+    if (buffered) {
+        csi_init_malloc(custom_malloc, custom_free);
+    }
+    // More than the VM's descriptor limit over time, but only four live at once.
+    for (size_t i = 0; i < 40; i++) {
+        uint64_t input[2], output[2];
+        REQUIRE(ckb_pipe(input) == 0);
+        REQUIRE(ckb_pipe(output) == 0);
+        CSIReader reader;
+        CSIWriter writer;
+        REQUIRE(new_pipe_reader(input[0], &reader) == 0);
+        REQUIRE(new_pipe_writer(output[1], &writer) == 0);
+        CSIChannel channel = {0};
+        new_buf_reader(reader, &channel.reader);
+        new_buf_writer(writer, &channel.writer);
+        csi_free_channel(&channel);
+        csi_free_channel(&channel);
+        REQUIRE(ckb_close(input[0]) == CKB_INVALID_FD);
+        REQUIRE(ckb_close(output[1]) == CKB_INVALID_FD);
+        uint8_t byte;
+        size_t len = 1;
+        REQUIRE(ckb_read(output[0], &byte, &len) == CKB_OTHER_END_CLOSED);
+        REQUIRE(ckb_close(input[1]) == 0);
+        REQUIRE(ckb_close(output[0]) == 0);
+    }
+    if (buffered) {
+        REQUIRE(custom_allocations == custom_frees);
+    }
 }
 
 static void test_custom_allocator_and_empty_response(void) {
@@ -161,6 +196,43 @@ static void test_read_errors(void) {
     csi_client_free_response_payload(&response);
 }
 
+static void test_truncated_response_payload(void) {
+    custom_allocations = 0;
+    custom_frees = 0;
+    csi_init_malloc(custom_malloc, custom_free);
+    const uint8_t packet[] = {0, 0, 2, 42, 43};
+    for (int buffered = 0; buffered < 2; buffered++) {
+        for (size_t available = 0; available <= 2; available++) {
+            Input input = {.data = packet, .len = 3 + available, .max_read = 1};
+            CSIReader reader = {.ctx = &input, .read = read_input};
+            CSIWriter writer = {.write = write_output, .flush = flush_output};
+            CSIChannel channel = {.reader = reader, .writer = writer};
+            if (buffered) {
+                new_buf_reader(reader, &channel.reader);
+                new_buf_writer(writer, &channel.writer);
+            }
+            CSIRequestPacket request = {0};
+            CSIResponsePacket response = {0};
+            int expected = available == 2 ? CSI_SUCCESS : CSI_ERROR_UNEXPECTED_EOF;
+            REQUIRE(csi_call(&channel, &request, &response) == expected);
+            REQUIRE(input.pos == input.len);
+            REQUIRE(response.payload_len == 2 && response.payload != NULL);
+            REQUIRE(memcmp(response.payload, packet + 3, available) == 0);
+            csi_client_free_response_payload(&response);
+            if (buffered) {
+                csi_free_channel(&channel);
+            }
+            REQUIRE(custom_allocations == custom_frees);
+        }
+    }
+
+    Input input = {.error = CSI_ERROR_INVALID_FD};
+    CSIReader reader = {.ctx = &input, .read = read_input};
+    uint8_t byte = 0;
+    REQUIRE(csi_read_exact(&reader, &byte, 0) == CSI_SUCCESS);
+    REQUIRE(csi_read_exact(&reader, &byte, 1) == CSI_ERROR_INVALID_FD);
+}
+
 static void test_vlq_overflow(void) {
     uint8_t encoded[10];
     memset(encoded, 0x80, sizeof(encoded));
@@ -209,9 +281,12 @@ int main(void) {
     csi_init_iobuf(io_storage, sizeof(io_storage), 0);
     return 1;
 #else
+    test_channel_closes_pipes(false);
+    test_channel_closes_pipes(true);
     test_custom_allocator_and_empty_response();
     test_fixed_allocator();
     test_read_errors();
+    test_truncated_response_payload();
     test_vlq_overflow();
     // Switching from fixed allocation must not retain its block size or free callback.
     csi_init_iobuf(io_storage, sizeof(io_storage), 2);

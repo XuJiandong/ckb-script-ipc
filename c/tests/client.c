@@ -10,7 +10,9 @@ static uint8_t g_io_buf[1024];
 int main() {
     printf("client started");
     csi_init_payload(g_payload_buf, sizeof(g_payload_buf), 2);
+#ifndef TEST_UNBUFFERED
     csi_init_iobuf(g_io_buf, sizeof(g_io_buf), 2);
+#endif
 
     int err = 0;
     CSIChannel channel;
@@ -49,4 +51,5 @@ int main() {
         }
         csi_client_free_response_payload(&response);
     }
+    csi_free_channel(&channel);
 }
