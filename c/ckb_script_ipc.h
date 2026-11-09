@@ -27,6 +27,7 @@ typedef enum CSIErrorCode {
     CSI_ERROR_IOBUF_TOO_SMALL,
     CSI_ERROR_FA_TOO_MANY_BLOCK,
     CSI_ERROR_FA_NOT_ALIGNED,
+    CSI_ERROR_FA_INVALID_BLOCK_COUNT,
 } CSIErrorCode;
 
 typedef void* (*CSIMalloc)(size_t len);
@@ -39,7 +40,7 @@ typedef void (*CSIPanic)(int exit_code);
  *
  * @param buf Pointer to the pre-allocated memory buffer
  * @param len Size of the pre-allocated buffer in bytes
- * @param block_count Number of memory blocks that can be allocated simultaneously
+ * @param block_count Number of memory blocks that can be allocated simultaneously (1 to 64)
  * @note This function is mutually exclusive with csi_init_malloc().
  *       Only one memory allocation strategy can be active at a time.
  */
@@ -52,8 +53,9 @@ void csi_init_payload(void* buf, size_t len, size_t block_count);
  *
  * @param buf Pointer to the pre-allocated memory buffer for I/O operations
  * @param len Size of the pre-allocated buffer in bytes
- * @param block_count Number of memory blocks that can be allocated simultaneously
+ * @param block_count Number of memory blocks that can be allocated simultaneously (1 to 64)
  * @note The buffer must be at least 1024 bytes in size.
+ * @note Each block must be larger than the internal I/O buffer header.
  * @note The buffer must be 2-byte aligned
  */
 void csi_init_iobuf(void* buf, size_t len, size_t block_count);
@@ -64,6 +66,7 @@ void csi_init_iobuf(void* buf, size_t len, size_t block_count);
  *
  * @param malloc Function pointer to custom memory allocation function
  * @param free Function pointer to custom memory deallocation function
+ * @note Each channel allocates two 1024-byte I/O buffers through these callbacks.
  *
  * @note This function is mutually exclusive with csi_init_payload() and csi_init_iobuf().
  *       Only one memory allocation strategy can be active at a time.
@@ -75,6 +78,7 @@ void csi_init_malloc(CSIMalloc malloc, CSIFree free);
  * This allows the user to define custom behavior when a panic occurs.
  *
  * @param panic Function pointer to the custom panic handler
+ * @note The panic handler must not return.
  *
  * @note The exit code passed to the panic handler indicates the reason
  *       for the panic.

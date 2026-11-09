@@ -70,3 +70,35 @@ fn test_c_impl_examples() {
 fn test_c_impl_tests() {
     test_c_impl("../../c/build/tests/client", "../../c/build/tests/server");
 }
+
+#[test]
+fn test_c_impl_regressions() {
+    test_c_impl(
+        "../../c/build/tests/regression",
+        "../../c/build/tests/server",
+    );
+}
+
+#[test]
+fn test_c_impl_rejects_small_iobuf() {
+    test_c_impl(
+        "../../c/build/tests/small_iobuf",
+        "../../c/build/tests/server",
+    );
+}
+
+#[test]
+fn test_c_impl_rejects_header_only_iobuf() {
+    test_c_impl(
+        "../../c/build/tests/header_only_iobuf",
+        "../../c/build/tests/server",
+    );
+}
+
+#[test]
+fn test_c_impl_rejects_zero_blocks() {
+    test_c_impl(
+        "../../c/build/tests/zero_blocks",
+        "../../c/build/tests/server",
+    );
+}
