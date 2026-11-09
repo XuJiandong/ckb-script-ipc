@@ -37,7 +37,15 @@ build/examples/client: examples/client.c build/libckb_script_ipc.a
 build/examples/server: examples/server.c build/libckb_script_ipc.a
 	$(CC) $(CFLAGS) $(LDFLAGS) -o build/examples/server examples/server.c build/libckb_script_ipc.a
 
-tests: build/tests/client build/tests/server
+tests: build/tests/client build/tests/server build/tests/regression build/tests/small_iobuf \
+       build/tests/header_only_iobuf build/tests/zero_blocks
+
+build/tests/small_iobuf: CFLAGS += -DTEST_SMALL_IOBUF
+build/tests/header_only_iobuf: CFLAGS += -DTEST_HEADER_ONLY_IOBUF
+build/tests/zero_blocks: CFLAGS += -DTEST_ZERO_BLOCKS
+
+build/tests/regression build/tests/small_iobuf build/tests/header_only_iobuf build/tests/zero_blocks: tests/regression.c ckb_script_ipc.c ckb_script_ipc.h | out
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ tests/regression.c
 
 build/tests/client: tests/client.c build/libckb_script_ipc.a
 	$(CC) $(CFLAGS) $(LDFLAGS) -o build/tests/client tests/client.c build/libckb_script_ipc.a
@@ -60,7 +68,8 @@ fmt:
 		examples/client.c \
 		examples/server.c \
 		tests/client.c \
-		tests/server.c
+		tests/server.c \
+		tests/regression.c
 
 scan-build:
 	scan-build make all
