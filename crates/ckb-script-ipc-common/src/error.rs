@@ -128,6 +128,6 @@ impl From<IpcError> for ProtocolErrorCode {
 
 impl From<u64> for ProtocolErrorCode {
     fn from(e: u64) -> Self {
-        Self::n(e).unwrap()
+        Self::n(e).unwrap_or(Self::UnknownError)
     }
 }

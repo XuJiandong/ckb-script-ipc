@@ -50,7 +50,8 @@ pub fn spawn_server(
 ) -> Result<(Pipe, Pipe), IpcError> {
     let (r1, w1) = pipe().map_err(IpcError::CkbSysError)?;
     let (r2, w2) = pipe().map_err(IpcError::CkbSysError)?;
-    let inherited_fds = &[r2, w1];
+    // The raw spawn syscall expects a zero-terminated descriptor array.
+    let inherited_fds = &[r2, w1, 0];
 
     let argc = argv.len();
     let mut process_id: u64 = 0;

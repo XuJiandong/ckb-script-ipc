@@ -23,6 +23,9 @@ pub fn vlq_decode(bytes: &[u8]) -> Result<u64, IpcError> {
     let mut value = 0u64;
     let mut shift = 0;
     for &byte in bytes {
+        if shift == 63 && (byte & 0x7F) > 1 {
+            return Err(IpcError::DecodeVlqOverflow);
+        }
         value |= ((byte & 0x7F) as u64) << shift;
         if byte & 0x80 == 0 {
             return Ok(value);
@@ -85,5 +88,20 @@ mod tests {
             vlq_decode(&[128]),
             Err(IpcError::IncompleteVlqSeq)
         ));
+    }
+
+    #[test]
+    fn test_vlq_decode_terminal_byte_overflow() {
+        let mut encoded = [0x80; 10];
+        for terminal in 2..=0x7F {
+            encoded[9] = terminal;
+            assert!(matches!(
+                vlq_decode(&encoded),
+                Err(IpcError::DecodeVlqOverflow)
+            ));
+        }
+
+        encoded[9] = 1;
+        assert_eq!(vlq_decode(&encoded).unwrap(), 1u64 << 63);
     }
 }

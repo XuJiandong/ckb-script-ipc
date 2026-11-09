@@ -338,13 +338,17 @@ impl ServiceGenerator<'_> {
             response_ident,
             camel_case_idents,
             return_types,
+            method_cfgs,
             ..
         } = self;
 
         quote! {
             #[derive(serde::Serialize, serde::Deserialize)]
             #vis enum #response_ident {
-                #( #camel_case_idents(#return_types) ),*
+                #(
+                    #( #method_cfgs )*
+                    #camel_case_idents(#return_types)
+                ),*
             }
         }
     }
