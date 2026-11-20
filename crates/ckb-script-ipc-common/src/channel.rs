@@ -36,8 +36,10 @@ impl<R: Read, W: Write> Channel<R, W> {
     ///
     /// This function runs an infinite loop, continuously receiving requests from the client,
     /// processing them using the provided service implementation, and sending back the responses.
-    /// If an error occurs during the processing of a request or the sending of a response, the
-    /// error is logged (if logging is enabled) and the error code is sent back to the client.
+    /// After reading a complete request packet, the server attempts to report processing errors
+    /// to the client. A packet read error ends the loop immediately because the client may still
+    /// be blocked writing the request. Callers managing raw pipe descriptors must close them
+    /// when this function returns.
     ///
     /// # Arguments
     ///
@@ -63,8 +65,13 @@ impl<R: Read, W: Write> Channel<R, W> {
         S: Serve<Req = Req, Resp = Resp>,
     {
         loop {
-            let result = self
-                .receive_request()
+            let request = {
+                let packet = RequestPacket::read_from(&mut self.reader)?;
+                #[cfg(feature = "enable-logging")]
+                log::info!("receive request: {:?}", packet);
+                from_slice(packet.payload()).map_err(|_| IpcError::DeserializeError)
+            };
+            let result = request
                 .and_then(|req| serve.serve(req))
                 .and_then(|resp| self.send_response(resp));
 
@@ -207,15 +214,6 @@ impl<R: Read, W: Write> Channel<R, W> {
         self.writer.flush()?;
         Ok(())
     }
-    pub(crate) fn receive_request<Req: for<'de> Deserialize<'de>>(
-        &mut self,
-    ) -> Result<Req, IpcError> {
-        let packet = RequestPacket::read_from(&mut self.reader)?;
-        #[cfg(feature = "enable-logging")]
-        log::info!("receive request: {:?}", packet);
-        let req = from_slice(packet.payload()).map_err(|_| IpcError::DeserializeError)?;
-        Ok(req)
-    }
     pub(crate) fn receive_response<Resp: for<'de> Deserialize<'de>>(
         &mut self,
     ) -> Result<Resp, IpcError> {
@@ -291,6 +289,40 @@ mod tests {
             self.flush_count += 1;
             Ok(())
         }
+    }
+
+    struct Echo;
+
+    impl Serve for Echo {
+        type Req = u8;
+        type Resp = u8;
+
+        fn serve(&mut self, req: u8) -> Result<u8, IpcError> {
+            Ok(req)
+        }
+    }
+
+    #[test]
+    fn execute_sends_no_reply_for_an_unread_request_body() {
+        let mut requests = RequestPacket::new(b"42".to_vec()).serialize();
+        requests.extend_from_slice(&[0, 0]);
+        requests.extend(crate::vlq::vlq_encode(MAX_PAYLOAD_SIZE as u64 + 1));
+        let mut replies = Vec::new();
+        let result = Channel::new(requests.as_slice(), &mut replies).execute(&mut Echo);
+        assert!(matches!(result, Err(IpcError::PayloadTooLarge)));
+        assert_eq!(replies, ResponsePacket::new(0, b"42".to_vec()).serialize());
+    }
+
+    #[test]
+    fn execute_reports_invalid_json_after_reading_the_packet() {
+        let request = RequestPacket::new(b"?".to_vec()).serialize();
+        let mut replies = Vec::new();
+        let result = Channel::new(request.as_slice(), &mut replies).execute(&mut Echo);
+        assert!(matches!(result, Err(IpcError::DeserializeError)));
+        assert_eq!(
+            replies,
+            ResponsePacket::new(ProtocolErrorCode::DeserializeError as u64, vec![]).serialize()
+        );
     }
 
     #[test]

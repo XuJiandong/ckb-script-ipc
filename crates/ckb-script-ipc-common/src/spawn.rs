@@ -116,7 +116,7 @@ pub fn spawn_cell_server(
 }
 /// Runs the server with the provided service implementation. This function listens for incoming
 /// requests, processes them using the provided service, and sends back the responses. It uses
-/// the inherited file descriptors for communication.
+/// the inherited file descriptors for communication and closes them before returning.
 ///
 /// # Arguments
 ///
@@ -153,5 +153,9 @@ where
     let reader: Pipe = fds[0].into();
     let writer: Pipe = fds[1].into();
     let channel = Channel::new(reader, writer);
-    channel.execute(&mut serve)
+    let result = channel.execute(&mut serve);
+    // Release a client still writing a rejected request, even if the server VM keeps running.
+    let _ = syscalls::close(fds[0]);
+    let _ = syscalls::close(fds[1]);
+    result
 }
