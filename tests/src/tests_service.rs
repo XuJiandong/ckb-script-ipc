@@ -179,9 +179,8 @@ fn test_secp256k1_verify() {
 }
 
 #[test]
-fn test_schnorr_verfiy() {
-    use k256::schnorr::{signature::Signer, SigningKey};
-    // recv
+fn test_schnorr_verify_prehash() {
+    use k256::schnorr::{signature::hazmat::PrehashSigner, Signature, SigningKey};
     let prehash = [0u8; 32];
 
     let prikey_byte: [u8; 32] = [
@@ -195,7 +194,8 @@ fn test_schnorr_verfiy() {
     witness.push(prehash.len() as u8);
     witness.extend_from_slice(&prehash);
 
-    let sig = prikey.sign(&prehash).to_bytes().to_vec();
+    let sig: Signature = prikey.sign_prehash(&prehash).unwrap();
+    let sig = sig.to_bytes();
     witness.push(sig.len() as u8);
     witness.extend_from_slice(&sig);
 

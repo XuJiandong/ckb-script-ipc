@@ -44,6 +44,7 @@ pub trait CkbCrypto {
         signature: Vec<u8>,
     ) -> Result<(), CryptoError>;
 
+    /// Verifies a BIP-340 signature over the supplied prehash bytes directly.
     fn schnorr_verify(
         public_key: Vec<u8>,
         prehash: Vec<u8>,

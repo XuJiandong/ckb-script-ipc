@@ -217,7 +217,7 @@ impl CkbCrypto for CryptoServer {
         prehash: Vec<u8>,
         signature: Vec<u8>,
     ) -> Result<(), CryptoError> {
-        use k256::schnorr::{signature::Verifier, Signature, VerifyingKey};
+        use k256::schnorr::{signature::hazmat::PrehashVerifier, Signature, VerifyingKey};
 
         let signature =
             Signature::try_from(signature.as_slice()).map_err(|_| CryptoError::InvalidSig)?;
@@ -226,7 +226,7 @@ impl CkbCrypto for CryptoServer {
             VerifyingKey::from_bytes(&public_key).map_err(|_| CryptoError::InvalidPubkey)?;
 
         verify_key
-            .verify(&prehash, &signature)
+            .verify_prehash(&prehash, &signature)
             .map_err(|_| CryptoError::VerifyFailed)?;
 
         Ok(())
